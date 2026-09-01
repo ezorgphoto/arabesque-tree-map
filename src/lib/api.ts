@@ -129,7 +129,68 @@ export const api = {
       if (error) throw new Error(error.message);
     },
   },
+  reports: {
+    list: async () =>
+      unwrap<Report[]>(
+        await supabase.from("reports").select("*").order("created_at", { ascending: false }),
+      ),
+    create: async (row: Partial<Report>) =>
+      unwrap(await supabase.from("reports").insert(row as never).select().single()),
+    update: async (id: string, row: Partial<Report>) =>
+      unwrap(await supabase.from("reports").update(row as never).eq("id", id).select().single()),
+    remove: async (id: string) => {
+      const { error } = await supabase.from("reports").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+  },
 };
+
+export const REPORT_BUCKET = "report-files";
+
+export async function uploadReportFile(file: File): Promise<Attachment> {
+  const safe = file.name.replace(/[^\w.\-\u0600-\u06FF]+/g, "_");
+  const path = `${crypto.randomUUID()}-${safe}`;
+  const { error } = await supabase.storage.from(REPORT_BUCKET).upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+  });
+  if (error) throw new Error(error.message);
+  return { path, name: file.name, type: file.type, size: file.size };
+}
+
+export async function removeReportFile(path: string) {
+  await supabase.storage.from(REPORT_BUCKET).remove([path]);
+}
+
+export async function reportFileUrl(path: string) {
+  const { data, error } = await supabase.storage
+    .from(REPORT_BUCKET)
+    .createSignedUrl(path, 60 * 60);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
+}
+
+export const REPORT_STATUSES = [
+  { key: "draft", label: "مسودة" },
+  { key: "submitted", label: "مُرسل" },
+  { key: "in_review", label: "قيد المراجعة" },
+  { key: "approved", label: "معتمد" },
+  { key: "rejected", label: "مرفوض" },
+] as const;
+
+export const REPORT_STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  REPORT_STATUSES.map((s) => [s.key, s.label]),
+);
+
+export const REPORT_TYPES: Record<string, string> = {
+  general: "عام",
+  financial: "مالي",
+  hr: "موارد بشرية",
+  operations: "تشغيلي",
+  compliance: "امتثال وجودة",
+  marketing: "تسويقي",
+};
+
 
 export const currency = (value: number) =>
   new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 0 }).format(value || 0);
