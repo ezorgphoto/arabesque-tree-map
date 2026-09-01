@@ -144,6 +144,60 @@ export type Database = {
           },
         ]
       }
+      reports: {
+        Row: {
+          attachments: Json
+          created_at: string
+          department: string
+          fields: Json
+          id: string
+          metrics: Json
+          period_date: string
+          priority: string
+          report_type: string
+          review_notes: string
+          reviewer: string
+          status: string
+          submitted_by: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json
+          created_at?: string
+          department?: string
+          fields?: Json
+          id?: string
+          metrics?: Json
+          period_date?: string
+          priority?: string
+          report_type?: string
+          review_notes?: string
+          reviewer?: string
+          status?: string
+          submitted_by?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json
+          created_at?: string
+          department?: string
+          fields?: Json
+          id?: string
+          metrics?: Json
+          period_date?: string
+          priority?: string
+          report_type?: string
+          review_notes?: string
+          reviewer?: string
+          status?: string
+          submitted_by?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assignee: string
