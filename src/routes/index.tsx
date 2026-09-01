@@ -1,24 +1,163 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Users, Building2, CheckCircle2, Wallet } from "lucide-react";
+import { api, currency, TASK_COLUMNS } from "@/lib/api";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  component: Dashboard,
+  head: () => ({
+    meta: [
+      { title: "لوحة القيادة | نظام الإدارة التنفيذية" },
+      { name: "description", content: "مؤشرات الأداء الرئيسية للفروع والموظفين والمهام." },
+      { property: "og:title", content: "لوحة القيادة | نظام الإدارة التنفيذية" },
+      { property: "og:description", content: "مؤشرات الأداء الرئيسية للفروع والموظفين والمهام." },
+    ],
+  }),
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+
+function Kpi({
+  label,
+  value,
+  hint,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: React.ElementType;
+}) {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="panel flex items-center gap-4 p-5">
+      <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <Icon className="size-6" />
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+        <p className="text-2xl font-extrabold">{value}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard() {
+  const employees = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
+  const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches.list });
+  const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks.list });
+
+  const emp = employees.data ?? [];
+  const br = branches.data ?? [];
+  const tk = tasks.data ?? [];
+
+  const payroll = emp.reduce((s, e) => s + Number(e.salary), 0);
+  const done = tk.filter((t) => t.status === "done").length;
+
+  const byBranch = br.map((b) => ({
+    name: b.name,
+    الإيرادات: Number(b.revenue),
+    الموظفون: emp.filter((e) => e.branch_id === b.id).length,
+  }));
+
+  const byDept = Object.entries(
+    emp.reduce<Record<string, number>>((acc, e) => {
+      const key = e.department || "غير محدد";
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {}),
+  ).map(([name, value]) => ({ name, value }));
+
+  const byStatus = TASK_COLUMNS.map((c) => ({
+    name: c.label,
+    المهام: tk.filter((t) => t.status === c.key).length,
+  }));
+
+  return (
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-3xl font-extrabold">لوحة القيادة</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          نظرة شاملة على أداء المؤسسة وفروعها في الوقت الحالي.
+        </p>
+      </header>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="إجمالي الموظفين" value={String(emp.length)} hint="مسجلون في النظام" icon={Users} />
+        <Kpi label="عدد الفروع" value={String(br.length)} hint="فروع نشطة" icon={Building2} />
+        <Kpi
+          label="المهام المكتملة"
+          value={`${done} / ${tk.length}`}
+          hint="خلال الفترة الحالية"
+          icon={CheckCircle2}
+        />
+        <Kpi label="إجمالي الرواتب" value={`${currency(payroll)} ر.س`} hint="شهرياً" icon={Wallet} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="panel p-5 lg:col-span-2">
+          <h2 className="mb-4 text-lg font-bold">الإيرادات حسب الفرع</h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={byBranch}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} orientation="right" />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="الإيرادات" fill="var(--chart-1)" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="panel p-5">
+          <h2 className="mb-4 text-lg font-bold">توزيع الموظفين حسب الإدارة</h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={byDept} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90}>
+                  {byDept.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel p-5">
+        <h2 className="mb-4 text-lg font-bold">حالة المهام</h2>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={byStatus}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} orientation="right" />
+              <Tooltip />
+              <Line type="monotone" dataKey="المهام" stroke="var(--chart-3)" strokeWidth={3} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }
