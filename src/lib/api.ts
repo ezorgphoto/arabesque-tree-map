@@ -132,8 +132,12 @@ export const api = {
   reports: {
     list: async () =>
       unwrap<Report[]>(
-        await supabase.from("reports").select("*").order("created_at", { ascending: false }),
+        (await supabase
+          .from("reports")
+          .select("*")
+          .order("created_at", { ascending: false })) as never,
       ),
+
     create: async (row: Partial<Report>) =>
       unwrap(await supabase.from("reports").insert(row as never).select().single()),
     update: async (id: string, row: Partial<Report>) =>
