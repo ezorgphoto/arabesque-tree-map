@@ -50,6 +50,31 @@ export type OrgNode = {
   created_at: string;
 };
 
+export type Attachment = {
+  path: string;
+  name: string;
+  type: string;
+  size: number;
+};
+
+export type Report = {
+  id: string;
+  title: string;
+  department: string;
+  report_type: string;
+  status: string;
+  priority: string;
+  submitted_by: string;
+  reviewer: string;
+  period_date: string;
+  review_notes: string;
+  fields: Record<string, string>;
+  metrics: Record<string, number>;
+  attachments: Attachment[];
+  created_at: string;
+  updated_at: string;
+};
+
 function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
   return res.data as T;
