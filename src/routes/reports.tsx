@@ -729,7 +729,10 @@ function ReportsPage() {
             </Button>
             <Button
               onClick={() => {
-                if (!form.title.trim()) return toast.error("العنوان مطلوب");
+                if (!form.title.trim()) {
+                  toast.error("العنوان مطلوب");
+                  return;
+                }
                 save.mutate();
               }}
               disabled={save.isPending}
