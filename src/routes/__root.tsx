@@ -8,7 +8,15 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
-import { LayoutDashboard, Network, Users, KanbanSquare, MapPin, Building2 } from "lucide-react";
+import {
+  LayoutDashboard,
+  Network,
+  Users,
+  KanbanSquare,
+  MapPin,
+  Building2,
+  FileBarChart2,
+} from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -19,6 +27,7 @@ const NAV = [
   { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network },
   { to: "/employees", label: "الموظفون", icon: Users },
   { to: "/tasks", label: "المهام", icon: KanbanSquare },
+  { to: "/reports", label: "مركز التقارير", icon: FileBarChart2 },
   { to: "/map", label: "خريطة الفروع", icon: MapPin },
 ];
 
