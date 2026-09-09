@@ -15,6 +15,8 @@ import { Route as HierarchyRouteImport } from './routes/hierarchy'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as ReportsIndexRouteImport } from './routes/reports.index'
+import { Route as ReportsNewRouteImport } from './routes/reports.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,22 +48,35 @@ const TasksRoute = TasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ReportsRoute,
+} as any)
+const ReportsNewRoute = ReportsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => ReportsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
-  '/reports': typeof ReportsRoute
+  '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
+  '/reports/new': typeof ReportsNewRoute
+  '/reports/': typeof ReportsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
-  '/reports': typeof ReportsRoute
   '/tasks': typeof TasksRoute
+  '/reports/new': typeof ReportsNewRoute
+  '/reports': typeof ReportsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -69,14 +84,31 @@ export interface FileRoutesById {
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
-  '/reports': typeof ReportsRoute
+  '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
+  '/reports/new': typeof ReportsNewRoute
+  '/reports/': typeof ReportsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/employees' | '/hierarchy' | '/map' | '/reports' | '/tasks'
+  fullPaths:
+    | '/'
+    | '/employees'
+    | '/hierarchy'
+    | '/map'
+    | '/reports'
+    | '/tasks'
+    | '/reports/new'
+    | '/reports/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/employees' | '/hierarchy' | '/map' | '/reports' | '/tasks'
+  to:
+    | '/'
+    | '/employees'
+    | '/hierarchy'
+    | '/map'
+    | '/tasks'
+    | '/reports/new'
+    | '/reports'
   id:
     | '__root__'
     | '/'
@@ -85,6 +117,8 @@ export interface FileRouteTypes {
     | '/map'
     | '/reports'
     | '/tasks'
+    | '/reports/new'
+    | '/reports/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -92,7 +126,7 @@ export interface RootRouteChildren {
   EmployeesRoute: typeof EmployeesRoute
   HierarchyRoute: typeof HierarchyRoute
   MapRoute: typeof MapRoute
-  ReportsRoute: typeof ReportsRoute
+  ReportsRoute: typeof ReportsRouteWithChildren
   TasksRoute: typeof TasksRoute
 }
 
@@ -140,15 +174,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TasksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/': {
+      id: '/reports/'
+      path: '/'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof ReportsIndexRouteImport
+      parentRoute: typeof ReportsRoute
+    }
+    '/reports/new': {
+      id: '/reports/new'
+      path: '/new'
+      fullPath: '/reports/new'
+      preLoaderRoute: typeof ReportsNewRouteImport
+      parentRoute: typeof ReportsRoute
+    }
   }
 }
+
+interface ReportsRouteChildren {
+  ReportsNewRoute: typeof ReportsNewRoute
+  ReportsIndexRoute: typeof ReportsIndexRoute
+}
+
+const ReportsRouteChildren: ReportsRouteChildren = {
+  ReportsNewRoute: ReportsNewRoute,
+  ReportsIndexRoute: ReportsIndexRoute,
+}
+
+const ReportsRouteWithChildren =
+  ReportsRoute._addFileChildren(ReportsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmployeesRoute: EmployeesRoute,
   HierarchyRoute: HierarchyRoute,
   MapRoute: MapRoute,
-  ReportsRoute: ReportsRoute,
+  ReportsRoute: ReportsRouteWithChildren,
   TasksRoute: TasksRoute,
 }
 export const routeTree = rootRouteImport
