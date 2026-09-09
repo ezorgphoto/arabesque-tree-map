@@ -149,16 +149,20 @@ export type Database = {
           attachments: Json
           created_at: string
           department: string
+          department_type: string
           fields: Json
+          file_url: string
           id: string
           metrics: Json
           period_date: string
           priority: string
+          report_data: Json
           report_type: string
           review_notes: string
           reviewer: string
           status: string
           submitted_by: string
+          submitter_name: string
           title: string
           updated_at: string
         }
@@ -166,33 +170,41 @@ export type Database = {
           attachments?: Json
           created_at?: string
           department?: string
+          department_type?: string
           fields?: Json
+          file_url?: string
           id?: string
           metrics?: Json
           period_date?: string
           priority?: string
+          report_data?: Json
           report_type?: string
           review_notes?: string
           reviewer?: string
           status?: string
           submitted_by?: string
-          title: string
+          submitter_name?: string
+          title?: string
           updated_at?: string
         }
         Update: {
           attachments?: Json
           created_at?: string
           department?: string
+          department_type?: string
           fields?: Json
+          file_url?: string
           id?: string
           metrics?: Json
           period_date?: string
           priority?: string
+          report_data?: Json
           report_type?: string
           review_notes?: string
           reviewer?: string
           status?: string
           submitted_by?: string
+          submitter_name?: string
           title?: string
           updated_at?: string
         }
