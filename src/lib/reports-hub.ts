@@ -9,10 +9,6 @@ export type HubReport = {
   file_url: string;
 };
 
-const table = () => supabase.from("reports") as never as {
-  select: (q: string) => never;
-};
-
 export async function listReports(): Promise<HubReport[]> {
   const { data, error } = await supabase
     .from("reports")
@@ -81,5 +77,3 @@ export async function attachmentUrl(path: string): Promise<string> {
 
 export const formatDate = (iso: string) =>
   new Intl.DateTimeFormat("ar", { dateStyle: "medium" }).format(new Date(iso));
-
-void table;
