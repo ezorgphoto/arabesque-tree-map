@@ -103,6 +103,30 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          title?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          title?: string
+        }
+        Relationships: []
+      }
       org_nodes: {
         Row: {
           created_at: string
@@ -243,6 +267,39 @@ export type Database = {
           priority?: string
           status?: string
           title?: string
+        }
+        Relationships: []
+      }
+      weekly_schedule: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          description: string
+          end_time: string
+          id: string
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week?: number
+          description?: string
+          end_time?: string
+          id?: string
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          description?: string
+          end_time?: string
+          id?: string
+          start_time?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
