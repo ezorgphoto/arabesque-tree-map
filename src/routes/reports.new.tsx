@@ -24,12 +24,11 @@ import {
   uploadAttachment,
 } from "@/lib/reports-hub";
 
-type Search = { id?: string };
+type Search = { id?: string | undefined };
 
 export const Route = createFileRoute("/reports/new")({
-  validateSearch: (search: Record<string, unknown>): Search => ({
-    id: typeof search['id'] === "string" ? (search['id'] as string) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): Search =>
+    typeof search['id'] === "string" ? { id: search['id'] as string } : {},
   head: () => ({
     meta: [
       { title: "إضافة تقرير جديد | مركز التقارير" },
