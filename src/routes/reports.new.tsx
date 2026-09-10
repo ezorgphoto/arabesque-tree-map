@@ -199,12 +199,13 @@ function NewReportPage() {
                   key={field.key}
                   className={`space-y-2 ${field.type === "textarea" ? "md:col-span-2" : ""}`}
                 >
-                  <Label>
+                  <Label htmlFor={`f-${field.key}`}>
                     {field.label}
                     {field.required ? <span className="text-destructive"> *</span> : null}
                   </Label>
                   {field.type === "textarea" ? (
                     <Textarea
+                      id={`f-${field.key}`}
                       rows={4}
                       maxLength={2000}
                       value={value}
@@ -225,6 +226,7 @@ function NewReportPage() {
                     </Select>
                   ) : (
                     <Input
+                      id={`f-${field.key}`}
                       type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
                       maxLength={field.type === "text" ? 200 : undefined}
                       value={value}
