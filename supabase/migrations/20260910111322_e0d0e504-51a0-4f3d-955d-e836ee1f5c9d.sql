@@ -1,0 +1,1 @@
+DELETE FROM public.reports WHERE submitter_name = 'أحمد التجريبي';
