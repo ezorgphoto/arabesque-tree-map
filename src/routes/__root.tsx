@@ -167,6 +167,10 @@ function Shell() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-2 backdrop-blur md:px-8">
+          <p className="text-sm font-bold text-muted-foreground">نظام الإدارة التنفيذية</p>
+          <NotificationBell />
+        </header>
         <nav className="flex gap-1 overflow-x-auto bg-sidebar p-2 md:hidden">
           {NAV.map((item) => (
             <Link
