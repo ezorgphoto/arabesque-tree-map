@@ -31,9 +31,9 @@ export const Route = createFileRoute("/assistant")({
 
 const uid = () => Math.random().toString(36).slice(2);
 
-function renderLine(line: string, key: number) {
-  const parts = line.split(/(\*\*[^*]+\*\*)/g);
-  const content = parts.map((p, i) =>
+function renderInline(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) =>
     p.startsWith("**") && p.endsWith("**") ? (
       <strong key={i} className="font-bold">
         {p.slice(2, -2)}
@@ -42,7 +42,9 @@ function renderLine(line: string, key: number) {
       <span key={i}>{p}</span>
     ),
   );
+}
 
+function renderLine(line: string, key: number) {
   if (line.startsWith("- ")) {
     return (
       <div key={key} className="flex gap-2 leading-relaxed">
@@ -57,14 +59,14 @@ function renderLine(line: string, key: number) {
         key={key}
         className="border-s-2 border-primary/50 bg-muted/50 px-3 py-2 text-sm italic"
       >
-        {line.slice(2)}
+        {renderInline(line.slice(2))}
       </blockquote>
     );
   }
   if (!line.trim()) return <div key={key} className="h-2" />;
   return (
     <p key={key} className="leading-relaxed">
-      {content}
+      {renderInline(line)}
     </p>
   );
 }
