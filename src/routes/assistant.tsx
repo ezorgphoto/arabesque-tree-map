@@ -45,9 +45,10 @@ function renderLine(line: string, key: number) {
 
   if (line.startsWith("- ")) {
     return (
-      <li key={key} className="ms-4 list-disc leading-relaxed">
-        {content.slice(0)}
-      </li>
+      <div key={key} className="flex gap-2 leading-relaxed">
+        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary/60" />
+        <span>{renderInline(line.slice(2))}</span>
+      </div>
     );
   }
   if (line.startsWith("> ")) {
