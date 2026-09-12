@@ -16,19 +16,24 @@ import {
   MapPin,
   Building2,
   FileBarChart2,
+  CalendarRange,
+  BrainCircuit,
 } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const NAV = [
   { to: "/", label: "لوحة القيادة", icon: LayoutDashboard },
   { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network },
   { to: "/employees", label: "الموظفون", icon: Users },
   { to: "/tasks", label: "المهام", icon: KanbanSquare },
+  { to: "/planner", label: "المخطط الأسبوعي", icon: CalendarRange },
   { to: "/reports", label: "مركز التقارير", icon: FileBarChart2 },
   { to: "/map", label: "خريطة الفروع", icon: MapPin },
+  { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit },
 ];
 
 function NotFoundComponent() {
@@ -162,6 +167,10 @@ function Shell() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-2 backdrop-blur md:px-8">
+          <p className="text-sm font-bold text-muted-foreground">نظام الإدارة التنفيذية</p>
+          <NotificationBell />
+        </header>
         <nav className="flex gap-1 overflow-x-auto bg-sidebar p-2 md:hidden">
           {NAV.map((item) => (
             <Link
