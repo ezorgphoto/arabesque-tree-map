@@ -16,19 +16,24 @@ import {
   MapPin,
   Building2,
   FileBarChart2,
+  CalendarRange,
+  BrainCircuit,
 } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const NAV = [
   { to: "/", label: "لوحة القيادة", icon: LayoutDashboard },
   { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network },
   { to: "/employees", label: "الموظفون", icon: Users },
   { to: "/tasks", label: "المهام", icon: KanbanSquare },
+  { to: "/planner", label: "المخطط الأسبوعي", icon: CalendarRange },
   { to: "/reports", label: "مركز التقارير", icon: FileBarChart2 },
   { to: "/map", label: "خريطة الفروع", icon: MapPin },
+  { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit },
 ];
 
 function NotFoundComponent() {

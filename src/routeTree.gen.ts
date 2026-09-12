@@ -10,9 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as HierarchyRouteImport } from './routes/hierarchy'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as PlannerRouteImport } from './routes/planner'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
@@ -21,6 +23,11 @@ import { Route as ReportsNewRouteImport } from './routes/reports.new'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssistantRoute = AssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmployeesRoute = EmployeesRouteImport.update({
@@ -36,6 +43,11 @@ const HierarchyRoute = HierarchyRouteImport.update({
 const MapRoute = MapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlannerRoute = PlannerRouteImport.update({
+  id: '/planner',
+  path: '/planner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -61,9 +73,11 @@ const ReportsNewRoute = ReportsNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
+  '/planner': typeof PlannerRoute
   '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
   '/reports/new': typeof ReportsNewRoute
@@ -71,9 +85,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
+  '/planner': typeof PlannerRoute
   '/tasks': typeof TasksRoute
   '/reports/new': typeof ReportsNewRoute
   '/reports': typeof ReportsIndexRoute
@@ -81,9 +97,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
+  '/planner': typeof PlannerRoute
   '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
   '/reports/new': typeof ReportsNewRoute
@@ -93,9 +111,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/assistant'
     | '/employees'
     | '/hierarchy'
     | '/map'
+    | '/planner'
     | '/reports'
     | '/tasks'
     | '/reports/new'
@@ -103,18 +123,22 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/assistant'
     | '/employees'
     | '/hierarchy'
     | '/map'
+    | '/planner'
     | '/tasks'
     | '/reports/new'
     | '/reports'
   id:
     | '__root__'
     | '/'
+    | '/assistant'
     | '/employees'
     | '/hierarchy'
     | '/map'
+    | '/planner'
     | '/reports'
     | '/tasks'
     | '/reports/new'
@@ -123,9 +147,11 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AssistantRoute: typeof AssistantRoute
   EmployeesRoute: typeof EmployeesRoute
   HierarchyRoute: typeof HierarchyRoute
   MapRoute: typeof MapRoute
+  PlannerRoute: typeof PlannerRoute
   ReportsRoute: typeof ReportsRouteWithChildren
   TasksRoute: typeof TasksRoute
 }
@@ -137,6 +163,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assistant': {
+      id: '/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AssistantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/employees': {
@@ -158,6 +191,13 @@ declare module '@tanstack/react-router' {
       path: '/map'
       fullPath: '/map'
       preLoaderRoute: typeof MapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/planner': {
+      id: '/planner'
+      path: '/planner'
+      fullPath: '/planner'
+      preLoaderRoute: typeof PlannerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -206,9 +246,11 @@ const ReportsRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AssistantRoute: AssistantRoute,
   EmployeesRoute: EmployeesRoute,
   HierarchyRoute: HierarchyRoute,
   MapRoute: MapRoute,
+  PlannerRoute: PlannerRoute,
   ReportsRoute: ReportsRouteWithChildren,
   TasksRoute: TasksRoute,
 }
