@@ -2,11 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, currency, STATUSES, type Employee } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -54,11 +55,27 @@ const empty: Partial<Employee> = {
   branch_id: null,
 };
 
+// مستويات التقييم (فكري / شرعي / تدريبي)
+const LEVELS = ["مبتدئ", "متوسط", "متقدم", "متميز"] as const;
+
+// الحقول التي يحفظها ملف الموظف (تتطلب ترحيل employees_profile_fields)
+const PROFILE_FIELDS: (keyof Employee)[] = [
+  "personality_type",
+  "strengths",
+  "problems",
+  "profile_notes",
+  "intellectual_level",
+  "religious_level",
+  "training_level",
+];
+
 function EmployeesPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Employee>>(empty);
   const [term, setTerm] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState<Partial<Employee>>({});
 
   const employees = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
   const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches.list });
@@ -86,6 +103,32 @@ function EmployeesPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const saveProfile = useMutation({
+    mutationFn: async (payload: Partial<Employee>) => {
+      const { id } = payload;
+      if (!id) throw new Error("معرّف الموظف مفقود");
+      const patch: Partial<Employee> = {};
+      for (const key of PROFILE_FIELDS) {
+        patch[key] = (payload[key] ?? "") as never;
+      }
+      return api.employees.update(id, patch);
+    },
+    onSuccess: () => {
+      invalidate();
+      setProfileOpen(false);
+      toast.success("تم حفظ ملف الموظف");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const openProfile = (e: Employee) => {
+    setProfile(e);
+    setProfileOpen(true);
+  };
+
+  const setProfileField = (key: keyof Employee, value: string) =>
+    setProfile((p) => ({ ...p, [key]: value }));
 
   const rows = (employees.data ?? []).filter((e) =>
     [e.full_name, e.job_title, e.department, e.email].join(" ").includes(term.trim()),
@@ -155,6 +198,16 @@ function EmployeesPage() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        aria-label="الملف الشخصي والتقييم"
+                        title="الملف الشخصي والتقييم"
+                        onClick={() => openProfile(e)}
+                      >
+                        <ClipboardList className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="تعديل"
                         onClick={() => {
                           setForm(e);
                           setOpen(true);
@@ -165,6 +218,7 @@ function EmployeesPage() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        aria-label="حذف"
                         onClick={() => {
                           if (confirm(`حذف الموظف ${e.full_name}؟`)) remove.mutate(e.id);
                         }}
@@ -288,6 +342,112 @@ function EmployeesPage() {
               onClick={() => save.mutate(form)}
             >
               حفظ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent dir="rtl" className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>الملف الشخصي والتقييم — {profile.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div>
+              <Label>نمط الشخصية</Label>
+              <Input
+                value={profile.personality_type ?? ""}
+                onChange={(e) => setProfileField("personality_type", e.target.value)}
+                placeholder="مثال: منظّم تحليلي، قيادي، تعاوني..."
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <Label>المستوى الفكري</Label>
+                <Select
+                  value={profile.intellectual_level ?? ""}
+                  onValueChange={(v) => setProfileField("intellectual_level", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر..." />
+                  </SelectTrigger>
+                  <SelectContent dir="rtl">
+                    {LEVELS.map((l) => (
+                      <SelectItem key={l} value={l}>
+                        {l}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>المستوى الشرعي</Label>
+                <Select
+                  value={profile.religious_level ?? ""}
+                  onValueChange={(v) => setProfileField("religious_level", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر..." />
+                  </SelectTrigger>
+                  <SelectContent dir="rtl">
+                    {LEVELS.map((l) => (
+                      <SelectItem key={l} value={l}>
+                        {l}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>المستوى التدريبي</Label>
+                <Select
+                  value={profile.training_level ?? ""}
+                  onValueChange={(v) => setProfileField("training_level", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر..." />
+                  </SelectTrigger>
+                  <SelectContent dir="rtl">
+                    {LEVELS.map((l) => (
+                      <SelectItem key={l} value={l}>
+                        {l}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>نقاط القوة</Label>
+              <Textarea
+                value={profile.strengths ?? ""}
+                onChange={(e) => setProfileField("strengths", e.target.value)}
+                placeholder="أبرز مهارات وقدرات الموظف..."
+              />
+            </div>
+            <div>
+              <Label>المشاكل والتحديات</Label>
+              <Textarea
+                value={profile.problems ?? ""}
+                onChange={(e) => setProfileField("problems", e.target.value)}
+                placeholder="التحديات أو الملاحظات التي تحتاج متابعة..."
+              />
+            </div>
+            <div>
+              <Label>ملاحظات عامة</Label>
+              <Textarea
+                value={profile.profile_notes ?? ""}
+                onChange={(e) => setProfileField("profile_notes", e.target.value)}
+                placeholder="ملاحظات إضافية حول الموظف..."
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setProfileOpen(false)}>
+              إلغاء
+            </Button>
+            <Button disabled={saveProfile.isPending} onClick={() => saveProfile.mutate(profile)}>
+              حفظ الملف
             </Button>
           </DialogFooter>
         </DialogContent>
