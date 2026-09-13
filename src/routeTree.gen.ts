@@ -14,6 +14,7 @@ import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as HierarchyRouteImport } from './routes/hierarchy'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as NotesRouteImport } from './routes/notes'
 import { Route as PlannerRouteImport } from './routes/planner'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as TasksRouteImport } from './routes/tasks'
@@ -43,6 +44,11 @@ const HierarchyRoute = HierarchyRouteImport.update({
 const MapRoute = MapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotesRoute = NotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlannerRoute = PlannerRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
+  '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
   '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
+  '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
   '/tasks': typeof TasksRoute
   '/reports/new': typeof ReportsNewRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/map': typeof MapRoute
+  '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
   '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/hierarchy'
     | '/map'
+    | '/notes'
     | '/planner'
     | '/reports'
     | '/tasks'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/hierarchy'
     | '/map'
+    | '/notes'
     | '/planner'
     | '/tasks'
     | '/reports/new'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/hierarchy'
     | '/map'
+    | '/notes'
     | '/planner'
     | '/reports'
     | '/tasks'
@@ -151,6 +163,7 @@ export interface RootRouteChildren {
   EmployeesRoute: typeof EmployeesRoute
   HierarchyRoute: typeof HierarchyRoute
   MapRoute: typeof MapRoute
+  NotesRoute: typeof NotesRoute
   PlannerRoute: typeof PlannerRoute
   ReportsRoute: typeof ReportsRouteWithChildren
   TasksRoute: typeof TasksRoute
@@ -191,6 +204,13 @@ declare module '@tanstack/react-router' {
       path: '/map'
       fullPath: '/map'
       preLoaderRoute: typeof MapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notes': {
+      id: '/notes'
+      path: '/notes'
+      fullPath: '/notes'
+      preLoaderRoute: typeof NotesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/planner': {
@@ -250,6 +270,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesRoute: EmployeesRoute,
   HierarchyRoute: HierarchyRoute,
   MapRoute: MapRoute,
+  NotesRoute: NotesRoute,
   PlannerRoute: PlannerRoute,
   ReportsRoute: ReportsRouteWithChildren,
   TasksRoute: TasksRoute,
