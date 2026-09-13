@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, Dot } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, BellRing, CheckCheck, Dot } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { notificationsApi, relativeTime } from "@/lib/extras";
+import { notificationsApi, relativeTime, scheduleApi } from "@/lib/extras";
+import {
+  notificationPermission,
+  notificationsSupported,
+  requestNotificationPermission,
+  scheduleTodayReminders,
+  showLocalNotification,
+} from "@/lib/reminders";
 
 export function NotificationBell() {
   const qc = useQueryClient();
@@ -18,6 +26,38 @@ export function NotificationBell() {
     queryFn: notificationsApi.list,
     refetchInterval: 60_000,
   });
+
+  const schedule = useQuery({ queryKey: ["weekly_schedule"], queryFn: scheduleApi.list });
+  const [perm, setPerm] = useState<NotificationPermission>("default");
+
+  useEffect(() => {
+    setPerm(notificationPermission());
+  }, []);
+
+  // إعادة جدولة تذكيرات اليوم عند منح الإذن أو تغيّر المواعيد.
+  useEffect(() => {
+    if (perm === "granted" && schedule.data) {
+      scheduleTodayReminders(schedule.data);
+    }
+  }, [perm, schedule.data]);
+
+  const enableReminders = async () => {
+    const result = await requestNotificationPermission();
+    setPerm(result);
+    if (result === "granted") {
+      const count = scheduleTodayReminders(schedule.data ?? []);
+      toast.success(
+        count > 0 ? `تم تفعيل التذكيرات — ${count} موعد اليوم` : "تم تفعيل التذكيرات",
+      );
+    } else {
+      toast.error("لم يُمنح إذن الإشعارات. فعّله من إعدادات المتصفح.");
+    }
+  };
+
+  const testReminder = () => {
+    const ok = showLocalNotification("تذكير تجريبي", "هكذا ستصلك تذكيرات المهام والمواعيد.");
+    if (!ok) toast.error("تعذّر عرض الإشعار. تحقّق من إذن الإشعارات.");
+  };
 
   const items = list.data ?? [];
   const unread = items.filter((n) => !n.is_read);
@@ -98,6 +138,35 @@ export function NotificationBell() {
             </button>
           ))}
         </ScrollArea>
+
+        <div className="border-t p-3">
+          {!notificationsSupported() ? (
+            <p className="text-center text-[11px] text-muted-foreground">
+              المتصفح لا يدعم الإشعارات
+            </p>
+          ) : perm === "granted" ? (
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-primary">
+                <BellRing className="size-3.5" /> تذكيرات المخطط مفعّلة
+              </span>
+              <button
+                type="button"
+                onClick={testReminder}
+                className="text-[11px] font-semibold text-primary hover:underline"
+              >
+                تجربة إشعار
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={enableReminders}
+              className="flex w-full items-center justify-center gap-1 rounded-md bg-primary/10 px-2 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15"
+            >
+              <BellRing className="size-3.5" /> تفعيل تذكيرات المتصفح
+            </button>
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );
