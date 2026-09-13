@@ -8,7 +8,10 @@ import {
   MessageSquareText,
   Pencil,
   Plus,
+  RotateCcw,
   Trash2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { api, type OrgNode } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -38,11 +41,26 @@ export const Route = createFileRoute("/hierarchy")({
   }),
 });
 
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2;
+const ZOOM_STEP = 0.1;
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
+
 function HierarchyPage() {
   const qc = useQueryClient();
   const nodes = useQuery({ queryKey: ["org_nodes"], queryFn: api.orgNodes.list });
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<OrgNode>>({});
+  const [zoom, setZoom] = useState(1);
+
+  const zoomIn = () => setZoom((z) => clampZoom(z + ZOOM_STEP));
+  const zoomOut = () => setZoom((z) => clampZoom(z - ZOOM_STEP));
+  const resetZoom = () => setZoom(1);
+  const onWheelZoom = (e: React.WheelEvent) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setZoom((z) => clampZoom(z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)));
+  };
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["org_nodes"] });
 
@@ -99,9 +117,55 @@ function HierarchyPage() {
         </Button>
       </header>
 
-      <div className="panel overflow-x-auto p-6">
-        <div className="flex min-w-max flex-col items-center gap-8">
-          {roots.map((root) => (
+      <div className="panel relative p-0">
+        <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-center gap-1 rounded-xl border bg-background/90 p-1 shadow-panel backdrop-blur">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="pointer-events-auto size-8"
+            onClick={zoomOut}
+            disabled={zoom <= ZOOM_MIN}
+            aria-label="تصغير"
+            title="تصغير"
+          >
+            <ZoomOut className="size-4" />
+          </Button>
+          <button
+            type="button"
+            onClick={resetZoom}
+            className="pointer-events-auto min-w-14 rounded-md px-2 py-1 text-xs font-bold tabular-nums text-muted-foreground transition-colors hover:bg-accent"
+            title="إعادة التعيين إلى 100%"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="pointer-events-auto size-8"
+            onClick={zoomIn}
+            disabled={zoom >= ZOOM_MAX}
+            aria-label="تكبير"
+            title="تكبير"
+          >
+            <ZoomIn className="size-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="pointer-events-auto size-8"
+            onClick={resetZoom}
+            aria-label="إعادة تعيين التقريب"
+            title="إعادة التعيين"
+          >
+            <RotateCcw className="size-4" />
+          </Button>
+        </div>
+        <div className="overflow-auto p-6 pt-16" onWheel={onWheelZoom}>
+          <div
+            className="flex min-w-max origin-top flex-col items-center gap-8 transition-[zoom] duration-150"
+            style={{ zoom }}
+          >
+            {roots.map((root) => (
             <NodeBranch
               key={root.id}
               node={root}
@@ -117,11 +181,12 @@ function HierarchyPage() {
               onSaveNotes={(id, notes) => saveNotes.mutate({ id, notes })}
             />
           ))}
-          {!roots.length && (
-            <p className="py-16 text-sm text-muted-foreground">
-              لا توجد وحدات بعد. ابدأ بإضافة وحدة رئيسية.
-            </p>
-          )}
+            {!roots.length && (
+              <p className="py-16 text-sm text-muted-foreground">
+                لا توجد وحدات بعد. ابدأ بإضافة وحدة رئيسية.
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
