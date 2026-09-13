@@ -162,8 +162,12 @@ function HierarchyPage() {
         </div>
         <div className="overflow-auto p-6 pt-16" onWheel={onWheelZoom}>
           <div
-            className="flex min-w-max origin-top flex-col items-center gap-8 transition-[zoom] duration-150"
-            style={{ zoom }}
+            className="mx-auto flex flex-col items-center gap-8 transition-transform duration-150"
+            style={{
+              width: "max-content",
+              transform: `scale(${zoom})`,
+              transformOrigin: "top center",
+            }}
           >
             {roots.map((root) => (
             <NodeBranch
