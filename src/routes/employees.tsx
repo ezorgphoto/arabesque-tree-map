@@ -4,6 +4,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, currency, STATUSES, type Employee } from "@/lib/api";
+import { listReports, formatDate } from "@/lib/reports-hub";
+import { DEPARTMENT_LABELS } from "@/lib/report-templates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +81,8 @@ function EmployeesPage() {
 
   const employees = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
   const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches.list });
+  const reports = useQuery({ queryKey: ["reports"], queryFn: listReports });
+  const relatedReports = (reports.data ?? []).filter((r) => r.employee_id === profile.id);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["employees"] });
 
@@ -440,6 +444,30 @@ function EmployeesPage() {
                 onChange={(e) => setProfileField("profile_notes", e.target.value)}
                 placeholder="ملاحظات إضافية حول الموظف..."
               />
+            </div>
+            <div className="border-t pt-3">
+              <Label>تقارير الأقسام المرتبطة ({relatedReports.length})</Label>
+              <div className="mt-2 max-h-44 space-y-2 overflow-y-auto rounded-lg bg-muted/40 p-2">
+                {relatedReports.length === 0 ? (
+                  <p className="py-3 text-center text-xs text-muted-foreground">
+                    لا توجد تقارير مرتبطة بهذا الموظف بعد. اربط تقريراً به من «مركز التقارير».
+                  </p>
+                ) : (
+                  relatedReports.map((r) => (
+                    <div key={r.id} className="rounded-md border bg-background p-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold">
+                          {DEPARTMENT_LABELS[r.department_type] ?? r.department_type}
+                        </span>
+                        <span className="text-muted-foreground">{formatDate(r.created_at)}</span>
+                      </div>
+                      {r.submitter_name && (
+                        <p className="mt-0.5 text-muted-foreground">مقدّم: {r.submitter_name}</p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter className="gap-2">
