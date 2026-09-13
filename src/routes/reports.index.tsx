@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DEPARTMENTS, DEPARTMENT_LABELS, getDepartment } from "@/lib/report-templates";
+import { api } from "@/lib/api";
 import { attachmentUrl, deleteReport, formatDate, listReports } from "@/lib/reports-hub";
 
 export const Route = createFileRoute("/reports/")({
@@ -72,10 +73,14 @@ function ReportsDashboard() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [dept, setDept] = useState("all");
+  const [emp, setEmp] = useState("all");
   const [openRow, setOpenRow] = useState<string | null>(null);
 
   const reports = useQuery({ queryKey: ["reports"], queryFn: listReports });
   const rows = reports.data ?? [];
+  const employees = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
+  const empName = (id?: string | null) =>
+    (id && employees.data?.find((e) => e.id === id)?.full_name) || null;
 
   const remove = useMutation({
     mutationFn: deleteReport,
@@ -90,6 +95,7 @@ function ReportsDashboard() {
     const q = search.trim();
     return rows.filter((r) => {
       if (dept !== "all" && r.department_type !== dept) return false;
+      if (emp !== "all" && r.employee_id !== emp) return false;
       if (!q) return true;
       const haystack = [
         r.submitter_name,
@@ -100,7 +106,7 @@ function ReportsDashboard() {
         .toLowerCase();
       return haystack.includes(q.toLowerCase());
     });
-  }, [rows, search, dept]);
+  }, [rows, search, dept, emp]);
 
   const byDept = useMemo(
     () =>
@@ -200,6 +206,19 @@ function ReportsDashboard() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={emp} onValueChange={setEmp}>
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">كل الموظفين</SelectItem>
+              {(employees.data ?? []).map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <span className="text-sm text-muted-foreground">
             {filtered.length} تقرير
           </span>
@@ -216,6 +235,7 @@ function ReportsDashboard() {
                 <tr>
                   <th className="px-4 py-3 font-semibold">القسم</th>
                   <th className="px-4 py-3 font-semibold">مقدّم التقرير</th>
+                  <th className="px-4 py-3 font-semibold">الموظف المعني</th>
                   <th className="px-4 py-3 font-semibold">التاريخ</th>
                   <th className="px-4 py-3 font-semibold">المرفق</th>
                   <th className="px-4 py-3 font-semibold">إجراءات</th>
@@ -252,6 +272,15 @@ function ReportsDashboard() {
                         ) : null}
                       </td>
                       <td className="px-4 py-3">{r.submitter_name || "—"}</td>
+                      <td className="px-4 py-3">
+                        {empName(r.employee_id) ? (
+                          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                            {empName(r.employee_id)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {formatDate(r.created_at)}
                       </td>
