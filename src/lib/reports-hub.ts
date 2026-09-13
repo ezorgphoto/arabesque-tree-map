@@ -7,12 +7,14 @@ export type HubReport = {
   submitter_name: string;
   report_data: Record<string, string>;
   file_url: string;
+  employee_id?: string | null;
 };
 
+// select("*") يتحمّل غياب عمود employee_id قبل تشغيل الترحيل، فلا تنكسر القائمة.
 export async function listReports(): Promise<HubReport[]> {
   const { data, error } = await supabase
     .from("reports")
-    .select("id, created_at, department_type, submitter_name, report_data, file_url")
+    .select("*")
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as HubReport[];
@@ -21,7 +23,7 @@ export async function listReports(): Promise<HubReport[]> {
 export async function getReport(id: string): Promise<HubReport | null> {
   const { data, error } = await supabase
     .from("reports")
-    .select("id, created_at, department_type, submitter_name, report_data, file_url")
+    .select("*")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -34,6 +36,8 @@ export type ReportInput = {
   report_data: Record<string, string>;
   file_url: string;
   title: string;
+  // اختياري: يُرسَل فقط عند اختيار موظف (يتطلب ترحيل reports_employee_link).
+  employee_id?: string | null;
 };
 
 export async function createReport(input: ReportInput) {

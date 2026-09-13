@@ -25,6 +25,14 @@ export type Employee = {
   branch_id: string | null;
   hired_at: string;
   created_at: string;
+  // حقول الملف الشخصي والتقييم (تتطلب ترحيل 20260913120000_employees_profile_fields)
+  personality_type?: string;
+  strengths?: string;
+  problems?: string;
+  profile_notes?: string;
+  intellectual_level?: string;
+  religious_level?: string;
+  training_level?: string;
 };
 
 export type Task = {

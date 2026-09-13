@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DEPARTMENTS, getDepartment } from "@/lib/report-templates";
+import { api } from "@/lib/api";
 import {
   attachmentUrl,
   createReport,
@@ -51,6 +52,9 @@ function NewReportPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [filePath, setFilePath] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [employeeId, setEmployeeId] = useState("");
+
+  const employees = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
 
   const existing = useQuery({
     queryKey: ["report", id],
@@ -65,6 +69,7 @@ function NewReportPage() {
     setSubmitter(row.submitter_name ?? "");
     setValues((row.report_data ?? {}) as Record<string, string>);
     setFilePath(row.file_url ?? "");
+    setEmployeeId(row.employee_id ?? "");
   }, [existing.data]);
 
   const def = useMemo(() => getDepartment(department), [department]);
@@ -79,6 +84,8 @@ function NewReportPage() {
         report_data: values,
         file_url: filePath,
         title,
+        // يُرسَل فقط عند اختيار موظف (يتطلب ترحيل reports_employee_link)
+        ...(employeeId ? { employee_id: employeeId } : {}),
       };
       if (id) await updateReport(id, payload);
       else await createReport(payload);
@@ -183,6 +190,25 @@ function NewReportPage() {
               onChange={(e) => setSubmitter(e.target.value)}
               placeholder="الاسم الكامل"
             />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>الموظف المعني (اختياري)</Label>
+            <Select
+              value={employeeId || "none"}
+              onValueChange={(v) => setEmployeeId(v === "none" ? "" : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="اختر موظفاً..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">بدون موظف محدد</SelectItem>
+                {(employees.data ?? []).map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
