@@ -18,6 +18,7 @@ import {
   FileBarChart2,
   CalendarRange,
   BrainCircuit,
+  NotebookPen,
 } from "lucide-react";
 
 import appCss from "../styles.css?url";
@@ -33,6 +34,7 @@ const NAV = [
   { to: "/planner", label: "المخطط الأسبوعي", icon: CalendarRange },
   { to: "/reports", label: "مركز التقارير", icon: FileBarChart2 },
   { to: "/map", label: "خريطة الفروع", icon: MapPin },
+  { to: "/notes", label: "الملاحظات", icon: NotebookPen },
   { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit },
 ];
 

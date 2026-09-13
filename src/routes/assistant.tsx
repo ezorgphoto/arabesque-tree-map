@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { BrainCircuit, Send, User2 } from "lucide-react";
+import { BrainCircuit, Send, Trash2, User2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,9 +32,18 @@ export const Route = createFileRoute("/assistant")({
 
 const uid = () => Math.random().toString(36).slice(2);
 
-function renderLine(line: string, key: number) {
-  const parts = line.split(/(\*\*[^*]+\*\*)/g);
-  const content = parts.map((p, i) =>
+const CHAT_STORAGE_KEY = "exec_assistant_chat_v1";
+
+const introMessage = (): ChatMessage => ({
+  id: uid(),
+  role: "assistant",
+  content: ASSISTANT_INTRO,
+  at: Date.now(),
+});
+
+function renderInline(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) =>
     p.startsWith("**") && p.endsWith("**") ? (
       <strong key={i} className="font-bold">
         {p.slice(2, -2)}
@@ -42,7 +52,9 @@ function renderLine(line: string, key: number) {
       <span key={i}>{p}</span>
     ),
   );
+}
 
+function renderLine(line: string, key: number) {
   if (line.startsWith("- ")) {
     return (
       <div key={key} className="flex gap-2 leading-relaxed">
@@ -57,26 +69,49 @@ function renderLine(line: string, key: number) {
         key={key}
         className="border-s-2 border-primary/50 bg-muted/50 px-3 py-2 text-sm italic"
       >
-        {line.slice(2)}
+        {renderInline(line.slice(2))}
       </blockquote>
     );
   }
   if (!line.trim()) return <div key={key} className="h-2" />;
   return (
     <p key={key} className="leading-relaxed">
-      {content}
+      {renderInline(line)}
     </p>
   );
 }
 
 function AssistantPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: uid(), role: "assistant", content: ASSISTANT_INTRO, at: Date.now() },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([introMessage()]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // استعادة المحادثة المحفوظة بعد التركيب (لتفادي اختلاف الترطيب مع SSR)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length) setMessages(parsed);
+      }
+    } catch {
+      // تجاهل بيانات تالفة
+    }
+    setLoaded(true);
+  }, []);
+
+  // حفظ المحادثة تلقائياً عند كل تغيير
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      // تجاهل أخطاء التخزين
+    }
+  }, [messages, loaded]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -85,6 +120,18 @@ function AssistantPage() {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  const clearChat = () => {
+    if (messages.length > 1 && !confirm("حذف هذه المحادثة نهائياً؟")) return;
+    setMessages([introMessage()]);
+    try {
+      localStorage.removeItem(CHAT_STORAGE_KEY);
+    } catch {
+      // تجاهل
+    }
+    toast.success("تم حذف المحادثة");
+    inputRef.current?.focus();
+  };
 
   const send = (text: string) => {
     const value = text.trim();
@@ -109,12 +156,21 @@ function AssistantPage() {
         <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <BrainCircuit className="size-6" />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-extrabold">المساعد الذكي الشخصي</h1>
           <p className="text-xs text-muted-foreground">
             نبرة تحليلية استراتيجية هادئة · يحترم استقلاليتك وخصوصيتك · يحوّل الرؤية إلى بنية
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={clearChat}
+          disabled={thinking || messages.length <= 1}
+          className="shrink-0 gap-1 text-destructive hover:text-destructive"
+        >
+          <Trash2 className="size-4" /> حذف المحادثة
+        </Button>
       </header>
 
       <div className="panel flex min-h-0 flex-1 flex-col p-0">
