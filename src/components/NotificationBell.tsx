@@ -18,6 +18,7 @@ import {
   scheduleTodayReminders,
   showLocalNotification,
 } from "@/lib/reminders";
+import { getVapidPublicKey, registerPushSubscription } from "@/lib/push";
 
 export function NotificationBell() {
   const qc = useQueryClient();
@@ -46,9 +47,26 @@ export function NotificationBell() {
     setPerm(result);
     if (result === "granted") {
       const count = scheduleTodayReminders(schedule.data ?? []);
-      toast.success(
-        count > 0 ? `تم تفعيل التذكيرات — ${count} موعد اليوم` : "تم تفعيل التذكيرات",
-      );
+      // تسجيل الجهاز لإشعارات Push (وأنت خارج التطبيق) إن وُجد مفتاح VAPID.
+      if (getVapidPublicKey()) {
+        const push = await registerPushSubscription();
+        if (push.ok) {
+          toast.success(
+            count > 0
+              ? `تم تفعيل التذكيرات والإشعارات — ${count} موعد اليوم`
+              : "تم تفعيل التذكيرات وإشعارات الجهاز",
+          );
+          return;
+        }
+        toast.success(
+          count > 0 ? `تم تفعيل التذكيرات — ${count} موعد اليوم` : "تم تفعيل التذكيرات",
+        );
+        if (push.reason) toast.message(`تنبيه Push: ${push.reason}`);
+      } else {
+        toast.success(
+          count > 0 ? `تم تفعيل التذكيرات — ${count} موعد اليوم` : "تم تفعيل التذكيرات",
+        );
+      }
     } else {
       toast.error("لم يُمنح إذن الإشعارات. فعّله من إعدادات المتصفح.");
     }
