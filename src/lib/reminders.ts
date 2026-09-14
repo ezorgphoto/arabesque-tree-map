@@ -19,16 +19,33 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   }
 }
 
-export function showLocalNotification(title: string, body: string): boolean {
+/** على الجوال/PWA يجب العرض عبر Service Worker؛ new Notification غالباً يفشل. */
+export async function showLocalNotification(
+  title: string,
+  body: string,
+): Promise<boolean> {
   if (!notificationsSupported() || Notification.permission !== "granted") return false;
+
+  const opts: NotificationOptions = {
+    body,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    dir: "rtl",
+    lang: "ar",
+  };
+
   try {
-    new Notification(title, {
-      body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      dir: "rtl",
-      lang: "ar",
-    });
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(title, opts);
+      return true;
+    }
+  } catch {
+    // نجرّب المسار الاحتياطي أدناه
+  }
+
+  try {
+    new Notification(title, opts);
     return true;
   } catch {
     return false;

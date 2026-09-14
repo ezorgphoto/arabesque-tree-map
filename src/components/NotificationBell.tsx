@@ -72,9 +72,16 @@ export function NotificationBell() {
     }
   };
 
-  const testReminder = () => {
-    const ok = showLocalNotification("تذكير تجريبي", "هكذا ستصلك تذكيرات المهام والمواعيد.");
-    if (!ok) toast.error("تعذّر عرض الإشعار. تحقّق من إذن الإشعارات.");
+  const testReminder = async () => {
+    const ok = await showLocalNotification(
+      "تذكير تجريبي",
+      "هكذا ستصلك تذكيرات المهام والمواعيد.",
+    );
+    if (!ok) {
+      toast.error(
+        "تعذّر عرض الإشعار. على الجوال: افتح التطبيق من أيقونة الشاشة الرئيسية واسمح بالإشعارات من إعدادات النظام.",
+      );
+    }
   };
 
   const items = list.data ?? [];
