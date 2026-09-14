@@ -42,6 +42,12 @@ export function NotificationBell() {
     }
   }, [perm, schedule.data]);
 
+  // تسجيل الجهاز للـ Push حتى لو كان الإذن ممنوحاً مسبقاً (بدون الضغط على تفعيل).
+  useEffect(() => {
+    if (perm !== "granted" || !getVapidPublicKey()) return;
+    void registerPushSubscription();
+  }, [perm]);
+
   const enableReminders = async () => {
     const result = await requestNotificationPermission();
     setPerm(result);
@@ -73,6 +79,10 @@ export function NotificationBell() {
   };
 
   const testReminder = async () => {
+    if (getVapidPublicKey()) {
+      const push = await registerPushSubscription();
+      if (!push.ok && push.reason) toast.message(`تنبيه Push: ${push.reason}`);
+    }
     const ok = await showLocalNotification(
       "تذكير تجريبي",
       "هكذا ستصلك تذكيرات المهام والمواعيد.",
