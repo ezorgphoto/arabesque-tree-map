@@ -180,7 +180,7 @@ function EmployeesPage() {
             const unit = e.org_unit || e.department;
             const role = e.app_role && e.app_role in ROLE_LABEL ? ROLE_LABEL[e.app_role] : null;
             return (
-              <li key={e.id} className="flex items-center gap-3 px-4 py-3">
+              <li key={e.id} className="flex w-full items-center gap-3 px-4 py-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-extrabold text-primary">
                   {e.full_name.trim().slice(0, 1)}
                 </div>

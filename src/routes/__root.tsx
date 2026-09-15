@@ -144,11 +144,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" className="h-full">
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body className="h-full">
         {children}
         <Scripts />
       </body>
@@ -161,8 +161,8 @@ function Shell() {
   const items = NAV.filter((item) => role && item.roles.includes(role));
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="sticky top-0 hidden h-screen w-[15.25rem] shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground md:flex">
+    <div className="flex h-svh overflow-hidden bg-background">
+      <aside className="hidden h-full w-[15.25rem] shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex items-center gap-3 px-4 py-5">
           <div className="flex size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
             <Building2 className="size-4" />
@@ -211,8 +211,8 @@ function Shell() {
         </button>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        <header className="flex items-center justify-between gap-3 border-b bg-card px-4 py-3 md:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b bg-card px-4 py-3 md:px-6">
           <div className="min-w-0">
             <p className="truncate text-sm font-extrabold">{profile?.full_name}</p>
             <p className="truncate text-xs text-muted-foreground">
@@ -233,7 +233,7 @@ function Shell() {
             </button>
           </div>
         </header>
-        <nav className="no-scrollbar grid grid-cols-3 gap-1 border-b bg-card p-2 md:hidden">
+        <nav className="no-scrollbar grid shrink-0 grid-cols-3 gap-1 border-b bg-card p-2 md:hidden">
           {items.map((item) => (
             <Link
               key={item.to}
@@ -246,7 +246,7 @@ function Shell() {
             </Link>
           ))}
         </nav>
-        <main className="min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">
+        <main className="no-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
           <Outlet />
         </main>
       </div>
