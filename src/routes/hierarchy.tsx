@@ -14,6 +14,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { api, type OrgNode } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +48,7 @@ const ZOOM_STEP = 0.1;
 const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
 
 function HierarchyPage() {
+  const { isLeadership } = useAuth();
   const qc = useQueryClient();
   const nodes = useQuery({ queryKey: ["org_nodes"], queryFn: api.orgNodes.list });
   const [open, setOpen] = useState(false);
@@ -112,9 +114,11 @@ function HierarchyPage() {
             شجرة تفاعلية للوحدات الإدارية، مع ملاحظات قابلة للتوسيع والحفظ لكل وحدة.
           </p>
         </div>
-        <Button onClick={() => openNew(null)}>
-          <Plus className="size-4" /> وحدة رئيسية جديدة
-        </Button>
+        {isLeadership && (
+          <Button onClick={() => openNew(null)}>
+            <Plus className="size-4" /> وحدة رئيسية جديدة
+          </Button>
+        )}
       </header>
 
       <div className="panel relative p-0">
@@ -330,6 +334,7 @@ function NodeCard({
   onDelete: () => void;
   onSaveNotes: (notes: string) => void;
 }) {
+  const { isLeadership } = useAuth();
   const [showNotes, setShowNotes] = useState(false);
   const [draft, setDraft] = useState(node.notes);
 
@@ -345,6 +350,7 @@ function NodeCard({
             </span>
           )}
         </div>
+        {isLeadership && (
         <div className="flex shrink-0 gap-0.5">
           <Button size="icon" variant="ghost" className="size-7" onClick={onEdit} aria-label="تعديل">
             <Pencil className="size-3.5" />
@@ -353,12 +359,15 @@ function NodeCard({
             <Trash2 className="size-3.5 text-destructive" />
           </Button>
         </div>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {isLeadership && (
         <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={onAddChild}>
           <Plus className="size-3" /> وحدة فرعية
         </Button>
+        )}
         <Button
           size="sm"
           variant="ghost"
@@ -377,6 +386,8 @@ function NodeCard({
 
       {showNotes && (
         <div className="mt-3 rounded-xl bg-muted/60 p-3">
+          {isLeadership ? (
+            <>
           <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -386,6 +397,12 @@ function NodeCard({
           <Button size="sm" className="mt-2 h-7 w-full text-xs" onClick={() => onSaveNotes(draft)}>
             حفظ الملاحظة
           </Button>
+            </>
+          ) : (
+            <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+              {node.notes || "لا توجد ملاحظات"}
+            </p>
+          )}
         </div>
       )}
     </div>

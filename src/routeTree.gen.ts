@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as HierarchyRouteImport } from './routes/hierarchy'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as NotesRouteImport } from './routes/notes'
 import { Route as PlannerRouteImport } from './routes/planner'
@@ -39,6 +40,11 @@ const EmployeesRoute = EmployeesRouteImport.update({
 const HierarchyRoute = HierarchyRouteImport.update({
   id: '/hierarchy',
   path: '/hierarchy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MapRoute = MapRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/assistant': typeof AssistantRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
+  '/login': typeof LoginRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/assistant': typeof AssistantRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
+  '/login': typeof LoginRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
@@ -108,6 +116,7 @@ export interface FileRoutesById {
   '/assistant': typeof AssistantRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
+  '/login': typeof LoginRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/employees'
     | '/hierarchy'
+    | '/login'
     | '/map'
     | '/notes'
     | '/planner'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/employees'
     | '/hierarchy'
+    | '/login'
     | '/map'
     | '/notes'
     | '/planner'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/employees'
     | '/hierarchy'
+    | '/login'
     | '/map'
     | '/notes'
     | '/planner'
@@ -162,6 +174,7 @@ export interface RootRouteChildren {
   AssistantRoute: typeof AssistantRoute
   EmployeesRoute: typeof EmployeesRoute
   HierarchyRoute: typeof HierarchyRoute
+  LoginRoute: typeof LoginRoute
   MapRoute: typeof MapRoute
   NotesRoute: typeof NotesRoute
   PlannerRoute: typeof PlannerRoute
@@ -197,6 +210,13 @@ declare module '@tanstack/react-router' {
       path: '/hierarchy'
       fullPath: '/hierarchy'
       preLoaderRoute: typeof HierarchyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/map': {
@@ -269,6 +289,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssistantRoute: AssistantRoute,
   EmployeesRoute: EmployeesRoute,
   HierarchyRoute: HierarchyRoute,
+  LoginRoute: LoginRoute,
   MapRoute: MapRoute,
   NotesRoute: NotesRoute,
   PlannerRoute: PlannerRoute,

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, currency, STATUSES, type Employee } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { listReports, formatDate } from "@/lib/reports-hub";
 import { DEPARTMENT_LABELS } from "@/lib/report-templates";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,8 @@ const empty: Partial<Employee> = {
   salary: 0,
   status: "active",
   branch_id: null,
+  org_unit: "",
+  app_role: "member",
 };
 
 // مستويات التقييم (فكري / شرعي / تدريبي)
@@ -72,6 +75,7 @@ const PROFILE_FIELDS: (keyof Employee)[] = [
 ];
 
 function EmployeesPage() {
+  const { isLeadership, isManager } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Employee>>(empty);
@@ -145,19 +149,23 @@ function EmployeesPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-extrabold">الموظفون</h1>
+          <h1 className="text-3xl font-extrabold">{isLeadership ? "الموظفون" : "زملاء القسم"}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            سجل الموظفين الكامل مع إمكانية الإضافة والتعديل والحذف.
+            {isLeadership
+              ? "سجل الأعضاء مع القسم والصلاحية. ضع بريداً لكل شخص ثم اطلب منه إنشاء حساب من صفحة الدخول."
+              : "الأعضاء العاملون معك في القسم. لا يمكنك الاطلاع على مهام أو ملفات الآخرين الخاصة."}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setForm(empty);
-            setOpen(true);
-          }}
-        >
-          <Plus className="size-4" /> إضافة موظف
-        </Button>
+        {isLeadership && (
+          <Button
+            onClick={() => {
+              setForm(empty);
+              setOpen(true);
+            }}
+          >
+            <Plus className="size-4" /> إضافة موظف
+          </Button>
+        )}
       </header>
 
       <div className="panel p-4">
@@ -177,11 +185,11 @@ function EmployeesPage() {
               <TableRow>
                 <TableHead className="text-right">الاسم</TableHead>
                 <TableHead className="text-right">المسمى الوظيفي</TableHead>
-                <TableHead className="text-right">الإدارة</TableHead>
-                <TableHead className="text-right">الفرع</TableHead>
-                <TableHead className="text-right">الراتب</TableHead>
+                <TableHead className="text-right">القسم</TableHead>
+                {isLeadership && <TableHead className="text-right">الفرع</TableHead>}
+                {isLeadership && <TableHead className="text-right">الراتب</TableHead>}
                 <TableHead className="text-right">الحالة</TableHead>
-                <TableHead className="text-right">إجراءات</TableHead>
+                {isLeadership && <TableHead className="text-right">إجراءات</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -189,16 +197,17 @@ function EmployeesPage() {
                 <TableRow key={e.id}>
                   <TableCell className="font-semibold">{e.full_name}</TableCell>
                   <TableCell>{e.job_title}</TableCell>
-                  <TableCell>{e.department}</TableCell>
-                  <TableCell>{branchName(e.branch_id)}</TableCell>
-                  <TableCell>{currency(Number(e.salary))} ر.س</TableCell>
+                  <TableCell>{e.org_unit || e.department || "—"}</TableCell>
+                  {isLeadership && <TableCell>{branchName(e.branch_id)}</TableCell>}
+                  {isLeadership && <TableCell>{currency(Number(e.salary))} ر.س</TableCell>}
                   <TableCell>
                     <Badge variant={e.status === "active" ? "default" : "secondary"}>
                       {STATUSES[e.status] ?? e.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
+                  {isLeadership && (
+                    <TableCell>
+                      <div className="flex gap-1">
                       <Button
                         size="icon"
                         variant="ghost"
@@ -229,8 +238,9 @@ function EmployeesPage() {
                       >
                         <Trash2 className="size-4 text-destructive" />
                       </Button>
-                    </div>
-                  </TableCell>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {!rows.length && (
@@ -268,19 +278,20 @@ function EmployeesPage() {
               />
             </div>
             <div>
-              <Label>الإدارة</Label>
+              <Label>القسم (للزملاء والصلاحيات)</Label>
               <Input
-                value={form.department ?? ""}
-                onChange={(e) => setForm({ ...form, department: e.target.value })}
-                placeholder="المالية"
+                value={form.org_unit ?? form.department ?? ""}
+                onChange={(e) => setForm({ ...form, org_unit: e.target.value, department: e.target.value })}
+                placeholder="مثال: الاعلام أو الاغاثي"
               />
             </div>
             <div>
-              <Label>البريد الإلكتروني</Label>
+              <Label>البريد الإلكتروني (لحساب الدخول)</Label>
               <Input
+                dir="ltr"
                 value={form.email ?? ""}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="name@corp.sa"
+                placeholder="name@example.com"
               />
             </div>
             <div>
@@ -314,6 +325,23 @@ function EmployeesPage() {
                       {v}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>الصلاحية</Label>
+              <Select
+                value={form.app_role ?? "member"}
+                onValueChange={(v) => setForm({ ...form, app_role: v as Employee["app_role"] })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent dir="rtl">
+                  <SelectItem value="member">عضو</SelectItem>
+                  <SelectItem value="supervisor">مشرف قسم / لجنة</SelectItem>
+                  <SelectItem value="deputy">نائب المسؤول</SelectItem>
+                  {isManager && <SelectItem value="manager">مسؤول العمل</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

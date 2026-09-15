@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ClientOnly } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly, Navigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { MapPin, Pencil, Plus, Trash2, Users, Wallet } from "lucide-react";
 import { api, currency, type Branch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +46,7 @@ const empty: Partial<Branch> = {
 };
 
 function MapPage() {
+  const { isLeadership } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Branch>>(empty);
@@ -81,6 +82,8 @@ function MapPage() {
   const list = branches.data ?? [];
   const staffCount = (id: string) =>
     (employees.data ?? []).filter((e) => e.branch_id === id).length;
+
+  if (!isLeadership) return <Navigate to="/" />;
 
   return (
     <div className="space-y-6">

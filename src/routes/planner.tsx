@@ -30,6 +30,7 @@ import {
   scheduleApi,
   type ScheduleBlock,
 } from "@/lib/extras";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/planner")({
   component: PlannerPage,
@@ -96,6 +97,7 @@ function monthMatrix(year: number, month: number): (Date | null)[] {
 }
 
 function PlannerPage() {
+  const { isLeadership } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<ScheduleBlock>>(emptyBlock(0, 8));
@@ -131,6 +133,7 @@ function PlannerPage() {
   const all = blocks.data ?? [];
 
   const openSlot = (day: number, hour: number) => {
+    if (!isLeadership) return;
     setForm(emptyBlock(day, hour));
     setOpen(true);
   };
@@ -187,9 +190,11 @@ function PlannerPage() {
               </button>
             ))}
           </div>
-          <Button onClick={() => openSlot(0, 9)}>
-            <Plus className="size-4" /> موعد جديد
-          </Button>
+          {isLeadership && (
+            <Button onClick={() => openSlot(0, 9)}>
+              <Plus className="size-4" /> موعد جديد
+            </Button>
+          )}
         </div>
       </header>
 
@@ -269,6 +274,7 @@ function PlannerPage() {
                 <article key={b.id} className="rounded-xl border bg-background p-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-semibold leading-snug">{b.title}</p>
+                    {isLeadership && (
                     <button
                       type="button"
                       onClick={() => {
@@ -279,6 +285,7 @@ function PlannerPage() {
                     >
                       <Trash2 className="size-4" />
                     </button>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {DAYS[b.day_of_week]?.label} · {hhmm(b.start_time)} — {hhmm(b.end_time)}

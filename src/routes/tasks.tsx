@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { CalendarDays, Plus, Trash2, User } from "lucide-react";
 import { api, PRIORITIES, TASK_COLUMNS, type Task } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +53,7 @@ const priorityStyle: Record<string, string> = {
 };
 
 function TasksPage() {
+  const { isLeadership, profile, canManageTasks } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Task>>(empty);
@@ -59,6 +61,11 @@ function TasksPage() {
   const [overCol, setOverCol] = useState<string | null>(null);
 
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks.list });
+  const employees = useQuery({
+    queryKey: ["employees"],
+    queryFn: api.employees.list,
+    enabled: canManageTasks,
+  });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["tasks"] });
 
   const save = useMutation({
@@ -101,17 +108,23 @@ function TasksPage() {
         <div>
           <h1 className="text-3xl font-extrabold">لوحة المهام</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            اسحب البطاقة وأفلتها في العمود المناسب لتغيير حالتها.
+            {canManageTasks
+              ? isLeadership
+                ? "أسند المهام لأي عضو. المشرف يرى مهام قسمه فقط."
+                : "أسند المهام لأعضاء قسمك أو لجنتك فقط."
+              : "مهامك فقط. لا تظهر مهام الزملاء."}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setForm(empty);
-            setOpen(true);
-          }}
-        >
-          <Plus className="size-4" /> مهمة جديدة
-        </Button>
+        {canManageTasks && (
+          <Button
+            onClick={() => {
+              setForm(empty);
+              setOpen(true);
+            }}
+          >
+            <Plus className="size-4" /> مهمة جديدة
+          </Button>
+        )}
       </header>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -259,11 +272,33 @@ function TasksPage() {
               </div>
               <div>
                 <Label>المسؤول</Label>
-                <Input
-                  value={form.assignee ?? ""}
-                  onChange={(e) => setForm({ ...form, assignee: e.target.value })}
-                  placeholder="اسم الموظف"
-                />
+                {canManageTasks ? (
+                  <Select
+                    value={form.assignee_id ?? "none"}
+                    onValueChange={(v) => {
+                      const emp = (employees.data ?? []).find((e) => e.id === v);
+                      setForm({
+                        ...form,
+                        assignee_id: v === "none" ? null : v,
+                        assignee: emp?.full_name ?? "",
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر عضواً" />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl">
+                      <SelectItem value="none">غير محدد</SelectItem>
+                      {(employees.data ?? []).map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={form.assignee || profile?.full_name || ""} readOnly />
+                )}
               </div>
               <div>
                 <Label>تاريخ الاستحقاق</Label>

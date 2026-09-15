@@ -33,6 +33,9 @@ export type Employee = {
   intellectual_level?: string;
   religious_level?: string;
   training_level?: string;
+  user_id?: string | null;
+  app_role?: "manager" | "deputy" | "supervisor" | "member";
+  org_unit?: string;
 };
 
 export type Task = {
@@ -42,6 +45,7 @@ export type Task = {
   status: string;
   priority: string;
   assignee: string;
+  assignee_id?: string | null;
   due_date: string | null;
   position: number;
   created_at: string;

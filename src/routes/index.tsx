@@ -17,9 +17,11 @@ import {
 } from "recharts";
 import { Users, Building2, CheckCircle2, Wallet } from "lucide-react";
 import { api, currency, TASK_COLUMNS } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { scheduleApi } from "@/lib/extras";
 
 export const Route = createFileRoute("/")({
-  component: Dashboard,
+  component: HomePage,
   head: () => ({
     meta: [
       { title: "لوحة القيادة | نظام الإدارة التنفيذية" },
@@ -52,6 +54,79 @@ function Kpi({
         <p className="text-xs font-semibold text-muted-foreground">{label}</p>
         <p className="text-2xl font-extrabold">{value}</p>
         <p className="text-xs text-muted-foreground">{hint}</p>
+      </div>
+    </div>
+  );
+}
+
+function HomePage() {
+  const { isLeadership, isSupervisor } = useAuth();
+  return isLeadership ? <Dashboard /> : <MemberHome isSupervisor={isSupervisor} />;
+}
+
+function MemberHome({ isSupervisor }: { isSupervisor: boolean }) {
+  const { profile } = useAuth();
+  const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks.list });
+  const people = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
+  const schedule = useQuery({ queryKey: ["weekly_schedule"], queryFn: scheduleApi.list });
+  const tk = tasks.data ?? [];
+  const mates = (people.data ?? []).filter((e) => e.id !== profile?.id);
+  const open = tk.filter((t) => t.status !== "done").length;
+
+  return (
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-3xl font-extrabold">مرحباً {profile?.full_name}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isSupervisor ? "مشرف القسم — مهام لجنتك وأعضاؤها" : profile?.job_title}
+          {profile?.org_unit || profile?.department
+            ? ` — ${profile?.org_unit || profile?.department}`
+            : ""}
+        </p>
+      </header>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="panel p-5">
+          <p className="text-xs font-semibold text-muted-foreground">
+            {isSupervisor ? "مهام القسم المفتوحة" : "مهامي المفتوحة"}
+          </p>
+          <p className="text-2xl font-extrabold">{open}</p>
+        </div>
+        <div className="panel p-5">
+          <p className="text-xs font-semibold text-muted-foreground">زملاء القسم</p>
+          <p className="text-2xl font-extrabold">{mates.length}</p>
+        </div>
+        <div className="panel p-5">
+          <p className="text-xs font-semibold text-muted-foreground">مواعيد المخطط</p>
+          <p className="text-2xl font-extrabold">{schedule.data?.length ?? 0}</p>
+        </div>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="panel p-5">
+          <h2 className="mb-3 font-extrabold">{isSupervisor ? "مهام القسم" : "مهامي"}</h2>
+          <ul className="space-y-2 text-sm">
+            {tk.slice(0, 8).map((t) => (
+              <li key={t.id} className="flex justify-between gap-2 border-b pb-2 last:border-0">
+                <span className="font-semibold">{t.title}</span>
+                <span className="text-muted-foreground">{TASK_COLUMNS.find((c) => c.key === t.status)?.label}</span>
+              </li>
+            ))}
+            {!tk.length && <p className="text-muted-foreground">لا توجد مهام مسندة إليك</p>}
+          </ul>
+        </div>
+        <div className="panel p-5">
+          <h2 className="mb-3 font-extrabold">من يعمل معي</h2>
+          <ul className="space-y-2 text-sm">
+            {mates.map((e) => (
+              <li key={e.id}>
+                <span className="font-semibold">{e.full_name}</span>
+                <span className="text-muted-foreground"> — {e.job_title || "عضو"}</span>
+              </li>
+            ))}
+            {!mates.length && (
+              <p className="text-muted-foreground">سيظهر زملاء قسمك هنا بعد تعيين القسم من المسؤول</p>
+            )}
+          </ul>
+        </div>
       </div>
     </div>
   );

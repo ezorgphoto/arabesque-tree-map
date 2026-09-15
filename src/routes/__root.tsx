@@ -2,8 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
+  Navigate,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -19,24 +21,26 @@ import {
   CalendarRange,
   BrainCircuit,
   NotebookPen,
+  LogOut,
 } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { NotificationBell } from "@/components/NotificationBell";
+import { AuthProvider, ROLE_LABEL, useAuth } from "@/lib/auth";
 
 const NAV = [
-  { to: "/", label: "لوحة القيادة", icon: LayoutDashboard },
-  { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network },
-  { to: "/employees", label: "الموظفون", icon: Users },
-  { to: "/tasks", label: "المهام", icon: KanbanSquare },
-  { to: "/planner", label: "المخطط الأسبوعي", icon: CalendarRange },
-  { to: "/reports", label: "مركز التقارير", icon: FileBarChart2 },
-  { to: "/map", label: "خريطة الفروع", icon: MapPin },
-  { to: "/notes", label: "الملاحظات", icon: NotebookPen },
-  { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit },
-];
+  { to: "/", label: "لوحة القيادة", icon: LayoutDashboard, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/employees", label: "الأعضاء", icon: Users, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/tasks", label: "المهام", icon: KanbanSquare, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/planner", label: "المخطط الزمني", icon: CalendarRange, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/reports", label: "مركز التقارير", icon: FileBarChart2, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/map", label: "خريطة الفروع", icon: MapPin, roles: ["manager", "deputy"] },
+  { to: "/notes", label: "الملاحظات", icon: NotebookPen, roles: ["manager", "deputy"] },
+  { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit, roles: ["manager", "deputy"] },
+] as const;
 
 function NotFoundComponent() {
   return (
@@ -143,6 +147,9 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function Shell() {
+  const { profile, role, signOut } = useAuth();
+  const items = NAV.filter((item) => role && item.roles.includes(role));
+
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-sidebar p-5 text-sidebar-foreground md:flex">
@@ -156,7 +163,7 @@ function Shell() {
           </div>
         </div>
         <nav className="flex flex-col gap-1">
-          {NAV.map((item) => (
+          {items.map((item) => (
             <Link
               key={item.to}
               to={item.to}
@@ -172,16 +179,38 @@ function Shell() {
             </Link>
           ))}
         </nav>
-        <p className="mt-auto text-xs text-sidebar-foreground/50">إصدار تجريبي — بيانات مباشرة</p>
+        <div className="mt-auto space-y-2 text-xs text-sidebar-foreground/70">
+          <p className="font-bold text-sidebar-foreground">{profile?.full_name}</p>
+          <p>{role ? ROLE_LABEL[role] : ""}</p>
+          <p>{profile?.org_unit || profile?.department || profile?.job_title}</p>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="flex items-center gap-1 pt-2 font-semibold text-sidebar-foreground/80 hover:text-sidebar-foreground"
+          >
+            <LogOut className="size-3.5" /> خروج
+          </button>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-2 backdrop-blur md:px-8">
-          <p className="text-sm font-bold text-muted-foreground">نظام الإدارة التنفيذية</p>
-          <NotificationBell />
+          <p className="truncate text-sm font-bold text-muted-foreground">
+            {profile?.full_name} — {role ? ROLE_LABEL[role] : "نظام الإدارة التنفيذية"}
+          </p>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <button
+              type="button"
+              className="text-xs font-semibold text-muted-foreground md:hidden"
+              onClick={() => void signOut()}
+            >
+              خروج
+            </button>
+          </div>
         </header>
         <nav className="flex gap-1 overflow-x-auto bg-sidebar p-2 md:hidden">
-          {NAV.map((item) => (
+          {items.map((item) => (
             <Link
               key={item.to}
               to={item.to}
@@ -201,6 +230,44 @@ function Shell() {
   );
 }
 
+function UnlinkedAccount() {
+  const { signOut } = useAuth();
+  return (
+    <div className="mx-auto max-w-md space-y-3 p-8 text-center">
+      <h1 className="text-xl font-extrabold">الحساب غير مربوط بموظف</h1>
+      <p className="text-sm text-muted-foreground">
+        اطلب من مسؤول العمل إدخال نفس بريدك في بطاقة الموظف ثم أنشئ الحساب من جديد.
+      </p>
+      <button type="button" className="text-sm font-semibold text-primary" onClick={() => void signOut()}>
+        خروج
+      </button>
+    </div>
+  );
+}
+
+function AuthGate() {
+  const { loading, session, profile } = useAuth();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isLogin = pathname === "/login";
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        جارٍ التحقق من الجلسة…
+      </div>
+    );
+  }
+  if (!session && !isLogin) return <Navigate to="/login" />;
+  if (session && isLogin) return <Navigate to="/" />;
+  if (!session && isLogin) return <Outlet />;
+  if (session && !profile) {
+    return (
+      <UnlinkedAccount />
+    );
+  }
+  return <Shell />;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -212,8 +279,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Shell />
-      <Toaster position="top-center" richColors dir="rtl" />
+      <AuthProvider>
+        <AuthGate />
+        <Toaster position="top-center" richColors dir="rtl" />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

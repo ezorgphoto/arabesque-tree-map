@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { BrainCircuit, Send, Trash2, User2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import {
   generateAssistantReply,
   type ChatMessage,
 } from "@/lib/assistant";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/assistant")({
   component: AssistantPage,
@@ -82,6 +83,7 @@ function renderLine(line: string, key: number) {
 }
 
 function AssistantPage() {
+  const { isLeadership } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([introMessage()]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
@@ -149,6 +151,8 @@ function AssistantPage() {
       inputRef.current?.focus();
     }, delay);
   };
+
+  if (!isLeadership) return <Navigate to="/" />;
 
   return (
     <div className="mx-auto flex h-[calc(100vh-6rem)] max-w-4xl flex-col gap-4">
