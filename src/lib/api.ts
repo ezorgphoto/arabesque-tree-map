@@ -49,6 +49,22 @@ export type Task = {
   due_date: string | null;
   position: number;
   created_at: string;
+  project_id?: string | null;
+};
+
+export type Project = {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  manager_id: string | null;
+  org_unit: string;
+  parent_id: string | null;
+  predecessor_id: string | null;
+  position: number;
+  created_at: string;
 };
 
 export type OrgNode = {
@@ -141,6 +157,20 @@ export const api = {
       if (error) throw new Error(error.message);
     },
   },
+  projects: {
+    list: async () =>
+      unwrap<Project[]>(
+        await supabase.from("projects").select("*").order("position").order("created_at"),
+      ),
+    create: async (row: Partial<Project>) =>
+      unwrap(await supabase.from("projects").insert(row as never).select().single()),
+    update: async (id: string, row: Partial<Project>) =>
+      unwrap(await supabase.from("projects").update(row as never).eq("id", id).select().single()),
+    remove: async (id: string) => {
+      const { error } = await supabase.from("projects").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+  },
   reports: {
     list: async () =>
       unwrap<Report[]>(
@@ -228,4 +258,11 @@ export const STATUSES: Record<string, string> = {
   active: "على رأس العمل",
   vacation: "في إجازة",
   suspended: "موقوف",
+};
+
+export const PROJECT_STATUSES: Record<string, string> = {
+  planned: "مخطط",
+  active: "جارٍ",
+  paused: "متوقف",
+  done: "مكتمل",
 };

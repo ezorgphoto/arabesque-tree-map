@@ -16,7 +16,10 @@ import { Route as HierarchyRouteImport } from './routes/hierarchy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as NotesRouteImport } from './routes/notes'
+import { Route as PermissionsRouteImport } from './routes/permissions'
 import { Route as PlannerRouteImport } from './routes/planner'
+import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as ProjectsIdRouteImport } from './routes/projects.$id'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
@@ -45,6 +48,21 @@ const HierarchyRoute = HierarchyRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PermissionsRoute = PermissionsRouteImport.update({
+  id: '/permissions',
+  path: '/permissions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsIdRoute = ProjectsIdRouteImport.update({
+  id: '/projects/$id',
+  path: '/projects/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MapRoute = MapRouteImport.update({
@@ -89,6 +107,9 @@ export interface FileRoutesByFullPath {
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/login': typeof LoginRoute
+  '/permissions': typeof PermissionsRoute
+  '/projects': typeof ProjectsRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
@@ -103,6 +124,9 @@ export interface FileRoutesByTo {
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/login': typeof LoginRoute
+  '/permissions': typeof PermissionsRoute
+  '/projects': typeof ProjectsRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
@@ -117,6 +141,9 @@ export interface FileRoutesById {
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/login': typeof LoginRoute
+  '/permissions': typeof PermissionsRoute
+  '/projects': typeof ProjectsRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/planner': typeof PlannerRoute
@@ -133,6 +160,9 @@ export interface FileRouteTypes {
     | '/employees'
     | '/hierarchy'
     | '/login'
+    | '/permissions'
+    | '/projects'
+    | '/projects/$id'
     | '/map'
     | '/notes'
     | '/planner'
@@ -147,6 +177,9 @@ export interface FileRouteTypes {
     | '/employees'
     | '/hierarchy'
     | '/login'
+    | '/permissions'
+    | '/projects'
+    | '/projects/$id'
     | '/map'
     | '/notes'
     | '/planner'
@@ -160,6 +193,9 @@ export interface FileRouteTypes {
     | '/employees'
     | '/hierarchy'
     | '/login'
+    | '/permissions'
+    | '/projects'
+    | '/projects/$id'
     | '/map'
     | '/notes'
     | '/planner'
@@ -175,6 +211,9 @@ export interface RootRouteChildren {
   EmployeesRoute: typeof EmployeesRoute
   HierarchyRoute: typeof HierarchyRoute
   LoginRoute: typeof LoginRoute
+  PermissionsRoute: typeof PermissionsRoute
+  ProjectsRoute: typeof ProjectsRoute
+  ProjectsIdRoute: typeof ProjectsIdRoute
   MapRoute: typeof MapRoute
   NotesRoute: typeof NotesRoute
   PlannerRoute: typeof PlannerRoute
@@ -217,6 +256,27 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/permissions': {
+      id: '/permissions'
+      path: '/permissions'
+      fullPath: '/permissions'
+      preLoaderRoute: typeof PermissionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$id': {
+      id: '/projects/$id'
+      path: '/projects/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof ProjectsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/map': {
@@ -290,6 +350,9 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesRoute: EmployeesRoute,
   HierarchyRoute: HierarchyRoute,
   LoginRoute: LoginRoute,
+  PermissionsRoute: PermissionsRoute,
+  ProjectsRoute: ProjectsRoute,
+  ProjectsIdRoute: ProjectsIdRoute,
   MapRoute: MapRoute,
   NotesRoute: NotesRoute,
   PlannerRoute: PlannerRoute,

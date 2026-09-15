@@ -22,6 +22,8 @@ import {
   BrainCircuit,
   NotebookPen,
   LogOut,
+  Shield,
+  FolderKanban,
 } from "lucide-react";
 
 import appCss from "../styles.css?url";
@@ -37,6 +39,8 @@ const NAV = [
   { to: "/tasks", label: "المهام", icon: KanbanSquare, roles: ["manager", "deputy", "supervisor", "member"] },
   { to: "/planner", label: "المخطط الزمني", icon: CalendarRange, roles: ["manager", "deputy", "supervisor", "member"] },
   { to: "/reports", label: "مركز التقارير", icon: FileBarChart2, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/projects", label: "المشاريع", icon: FolderKanban, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/permissions", label: "الصلاحيات", icon: Shield, roles: ["manager"] },
   { to: "/map", label: "خريطة الفروع", icon: MapPin, roles: ["manager", "deputy"] },
   { to: "/notes", label: "الملاحظات", icon: NotebookPen, roles: ["manager", "deputy"] },
   { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit, roles: ["manager", "deputy"] },

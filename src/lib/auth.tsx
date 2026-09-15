@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
   useContext,
@@ -130,7 +131,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loading, session, profile, role],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <QueryRevalidator ready={!loading && !!session && !!profile} />
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function QueryRevalidator({ ready }: { ready: boolean }) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (ready) void qc.invalidateQueries();
+  }, [ready, qc]);
+  return null;
 }
 
 export function useAuth() {
