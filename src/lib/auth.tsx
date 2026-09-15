@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
-import { hasStoredAccessToken, rememberAccessToken, supabase } from "@/integrations/supabase/client";
+import { rememberAccessToken, supabase } from "@/integrations/supabase/client";
 import type { Employee } from "@/lib/api";
 
 export type AppRole = "manager" | "deputy" | "supervisor" | "member";
@@ -70,32 +70,30 @@ function normalizeProfile(row: AuthProfile): AuthProfile {
   return { ...row, app_role: "member" };
 }
 
-async function loadProfile(): Promise<AuthProfile | null> {
-  const { data: authData } = await supabase.auth.getUser();
-  const user = authData.user;
-  if (!user) return null;
+async function loadProfile(user: User): Promise<AuthProfile | null> {
+  try {
+    const rpc = await (supabase as unknown as {
+      rpc: (fn: string) => Promise<{ data: AuthProfile | AuthProfile[] | null; error: { message: string } | null }>;
+    }).rpc("my_employee");
+    const rpcRow = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+    if (!rpc.error && rpcRow?.id) return normalizeProfile(rpcRow);
 
-  const rpc = await (supabase as unknown as {
-    rpc: (fn: string) => Promise<{ data: AuthProfile | AuthProfile[] | null; error: { message: string } | null }>;
-  }).rpc("my_employee");
-  const rpcRow = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
-  if (!rpc.error && rpcRow?.id) return normalizeProfile(rpcRow);
+    const byId = await supabase.from("employees").select("*").eq("user_id", user.id).maybeSingle();
+    if (!byId.error && byId.data) return normalizeProfile(byId.data as AuthProfile);
 
-  const byId = await supabase.from("employees").select("*").eq("user_id", user.id).maybeSingle();
-  if (!byId.error && byId.data) return normalizeProfile(byId.data as AuthProfile);
-
-  if (user.email) {
-    const byEmail = await supabase.from("employees").select("*").ilike("email", user.email).maybeSingle();
-    if (!byEmail.error && byEmail.data) return normalizeProfile(byEmail.data as AuthProfile);
+    if (user.email) {
+      const byEmail = await supabase.from("employees").select("*").ilike("email", user.email).maybeSingle();
+      if (!byEmail.error && byEmail.data) return normalizeProfile(byEmail.data as AuthProfile);
+    }
+  } catch (e) {
+    console.error(e);
   }
-
-  console.error(rpc.error ?? byId.error);
   return null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const cached = readCachedProfile();
-  const [loading, setLoading] = useState(() => !cached && !hasStoredAccessToken());
+  const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(cached);
   const userIdRef = useRef<string | null>(cached?.user_id ?? null);
@@ -105,8 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     rememberAccessToken(data.session?.access_token ?? null);
     setSession(data.session);
     userIdRef.current = data.session?.user.id ?? null;
-    if (data.session) {
-      const next = await loadProfile();
+    if (data.session?.user) {
+      const next = await loadProfile(data.session.user);
       setProfile(next);
       writeCachedProfile(next);
     } else {
@@ -128,19 +126,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
-      keepSession(data.session);
-      if (data.session) {
-        const next = await loadProfile();
+      const timer = window.setTimeout(() => {
+        if (mounted) setLoading(false);
+      }, 2500);
+      try {
+        const { data } = await supabase.auth.getSession();
         if (!mounted) return;
-        setProfile(next);
-        writeCachedProfile(next);
-      } else if (!hasStoredAccessToken()) {
-        setProfile(null);
-        writeCachedProfile(null);
+        keepSession(data.session);
+        setLoading(false);
+        if (data.session?.user) {
+          const next = await loadProfile(data.session.user);
+          if (!mounted) return;
+          setProfile(next);
+          writeCachedProfile(next);
+        } else {
+          setProfile(null);
+          writeCachedProfile(null);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        window.clearTimeout(timer);
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
     })();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
@@ -154,16 +162,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!next) return;
-      if (event === "SIGNED_IN" && userIdRef.current && userIdRef.current !== next.user.id) {
-        keepSession(next);
-        void loadProfile().then((row) => {
+      keepSession(next);
+      setLoading(false);
+      if (event === "SIGNED_IN" && next.user) {
+        void loadProfile(next.user).then((row) => {
           if (!mounted) return;
           setProfile(row);
           writeCachedProfile(row);
         });
-        return;
       }
-      keepSession(next);
     });
 
     return () => {

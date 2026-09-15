@@ -274,7 +274,8 @@ function AuthGate() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isLogin = pathname === "/login";
 
-  if (loading && !profile) {
+  if (profile) return <Shell />;
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         جارٍ التحقق من الجلسة…
@@ -293,11 +294,7 @@ function RootComponent() {
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
-    void (async () => {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((reg) => reg.unregister()));
-      await navigator.serviceWorker.register("/sw.js");
-    })();
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
 
   return (
