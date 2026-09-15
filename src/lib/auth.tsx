@@ -3,12 +3,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
-import { rememberAccessToken, supabase } from "@/integrations/supabase/client";
+import { hasStoredAccessToken, rememberAccessToken, supabase } from "@/integrations/supabase/client";
 import type { Employee } from "@/lib/api";
 
 export type AppRole = "manager" | "deputy" | "supervisor" | "member";
@@ -34,6 +35,27 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+const PROFILE_CACHE = "exec-auth-profile";
+
+function readCachedProfile(): AuthProfile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(PROFILE_CACHE);
+    return raw ? (JSON.parse(raw) as AuthProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedProfile(profile: AuthProfile | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (profile) window.sessionStorage.setItem(PROFILE_CACHE, JSON.stringify(profile));
+    else window.sessionStorage.removeItem(PROFILE_CACHE);
+  } catch {
+    /* ignore */
+  }
+}
 
 function normalizeProfile(row: AuthProfile): AuthProfile {
   const role = row.app_role;
@@ -72,46 +94,78 @@ async function loadProfile(): Promise<AuthProfile | null> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [loading, setLoading] = useState(true);
+  const cached = readCachedProfile();
+  const [loading, setLoading] = useState(() => !cached && !hasStoredAccessToken());
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const [profile, setProfile] = useState<AuthProfile | null>(cached);
+  const userIdRef = useRef<string | null>(cached?.user_id ?? null);
 
   const refresh = async () => {
     const { data } = await supabase.auth.getSession();
+    rememberAccessToken(data.session?.access_token ?? null);
     setSession(data.session);
-    if (data.session) setProfile(await loadProfile());
-    else setProfile(null);
+    userIdRef.current = data.session?.user.id ?? null;
+    if (data.session) {
+      const next = await loadProfile();
+      setProfile(next);
+      writeCachedProfile(next);
+    } else {
+      setProfile(null);
+      writeCachedProfile(null);
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
     let mounted = true;
-    let seq = 0;
-    let bootstrapped = false;
 
-    const applySession = async (next: Session | null, reloadProfile: boolean) => {
-      const n = ++seq;
+    const keepSession = (next: Session | null) => {
       rememberAccessToken(next?.access_token ?? null);
-      setSession(next);
-      if (!reloadProfile) return;
-      if (!bootstrapped) setLoading(true);
-      const nextProfile = next ? await loadProfile() : null;
-      if (!mounted || n !== seq) return;
-      setProfile(nextProfile);
-      bootstrapped = true;
-      setLoading(false);
+      if (next) {
+        userIdRef.current = next.user.id;
+        setSession(next);
+      }
     };
 
-    supabase.auth.getSession().then(({ data }) => {
-      void applySession(data.session, true);
-    });
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      keepSession(data.session);
+      if (data.session) {
+        const next = await loadProfile();
+        if (!mounted) return;
+        setProfile(next);
+        writeCachedProfile(next);
+      } else if (!hasStoredAccessToken()) {
+        setProfile(null);
+        writeCachedProfile(null);
+      }
+      setLoading(false);
+    })();
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
-      if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
-        rememberAccessToken(next?.access_token ?? null);
-        setSession(next);
+      if (event === "SIGNED_OUT") {
+        rememberAccessToken(null);
+        userIdRef.current = null;
+        setSession(null);
+        setProfile(null);
+        writeCachedProfile(null);
+        setLoading(false);
         return;
       }
-      void applySession(next, true);
+      if (!next) return;
+      if (event === "SIGNED_IN" && userIdRef.current && userIdRef.current !== next.user.id) {
+        keepSession(next);
+        void loadProfile().then((row) => {
+          if (!mounted) return;
+          setProfile(row);
+          writeCachedProfile(row);
+        });
+        return;
+      }
+      keepSession(next);
     });
+
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
@@ -134,13 +188,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut: async () => {
         await supabase.auth.signOut();
         rememberAccessToken(null);
+        writeCachedProfile(null);
         setProfile(null);
+        setSession(null);
       },
     }),
     [loading, session, profile, role],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

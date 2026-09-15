@@ -13,6 +13,10 @@ export function rememberAccessToken(token: string | null) {
   memoryAccessToken = token;
 }
 
+export function hasStoredAccessToken() {
+  return !!readAccessToken();
+}
+
 function readAccessToken(): string | null {
   if (memoryAccessToken) return memoryAccessToken;
   if (typeof window === "undefined") return null;
