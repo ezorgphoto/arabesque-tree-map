@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
   useContext,
@@ -87,23 +86,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
     let seq = 0;
+    let bootstrapped = false;
 
-    const applySession = async (next: Session | null) => {
+    const applySession = async (next: Session | null, reloadProfile: boolean) => {
       const n = ++seq;
       rememberAccessToken(next?.access_token ?? null);
       setSession(next);
-      setLoading(true);
+      if (!reloadProfile) return;
+      if (!bootstrapped) setLoading(true);
       const nextProfile = next ? await loadProfile() : null;
       if (!mounted || n !== seq) return;
       setProfile(nextProfile);
+      bootstrapped = true;
       setLoading(false);
     };
 
     supabase.auth.getSession().then(({ data }) => {
-      void applySession(data.session);
+      void applySession(data.session, true);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      void applySession(next);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+        rememberAccessToken(next?.access_token ?? null);
+        setSession(next);
+        return;
+      }
+      void applySession(next, true);
     });
     return () => {
       mounted = false;
@@ -133,21 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loading, session, profile, role],
   );
 
-  return (
-    <AuthContext.Provider value={value}>
-      <QueryRevalidator ready={!loading && !!session && !!profile} />
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-function QueryRevalidator({ ready }: { ready: boolean }) {
-  const qc = useQueryClient();
-  useEffect(() => {
-    if (ready) void qc.invalidateQueries();
-  }, [ready, qc]);
-  return null;
-}
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
