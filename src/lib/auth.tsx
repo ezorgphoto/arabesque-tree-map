@@ -36,18 +36,26 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null);
 
 async function loadProfile(): Promise<AuthProfile | null> {
-  const uid = (await supabase.auth.getUser()).data.user?.id;
-  if (!uid) return null;
-  const { data, error } = await supabase
-    .from("employees")
-    .select("*")
-    .eq("user_id", uid)
-    .maybeSingle();
-  if (error) {
-    console.error(error);
-    return null;
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData.user;
+  if (!user) return null;
+
+  const rpc = await (supabase as unknown as {
+    rpc: (fn: string) => Promise<{ data: AuthProfile | AuthProfile[] | null; error: { message: string } | null }>;
+  }).rpc("my_employee");
+  const rpcRow = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+  if (!rpc.error && rpcRow?.id) return rpcRow;
+
+  const byId = await supabase.from("employees").select("*").eq("user_id", user.id).maybeSingle();
+  if (!byId.error && byId.data) return byId.data as AuthProfile;
+
+  if (user.email) {
+    const byEmail = await supabase.from("employees").select("*").ilike("email", user.email).maybeSingle();
+    if (!byEmail.error && byEmail.data) return byEmail.data as AuthProfile;
   }
-  return data as AuthProfile | null;
+
+  console.error(rpc.error ?? byId.error);
+  return null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

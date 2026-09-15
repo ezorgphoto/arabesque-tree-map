@@ -66,6 +66,9 @@ export type Database = {
           phone: string
           salary: number
           status: string
+          user_id: string | null
+          app_role: string
+          org_unit: string
         }
         Insert: {
           branch_id?: string | null
