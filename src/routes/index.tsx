@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Building2, CheckCircle2, Wallet } from "lucide-react";
 import { api, currency, TASK_COLUMNS } from "@/lib/api";
@@ -52,6 +52,7 @@ function MemberHome({ isSupervisor }: { isSupervisor: boolean }) {
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks.list });
   const people = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
   const schedule = useQuery({ queryKey: ["weekly_schedule"], queryFn: scheduleApi.list });
+  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects.list });
   const tk = tasks.data ?? [];
   const mates = (people.data ?? []).filter((e) => e.id !== profile?.id);
   const open = tk.filter((t) => t.status !== "done").length;
@@ -116,6 +117,30 @@ function MemberHome({ isSupervisor }: { isSupervisor: boolean }) {
           </ul>
         </div>
       </div>
+      <div className="panel p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-extrabold">عمل الفريق</h2>
+          <Link to="/projects" className="text-xs font-semibold text-primary">
+            عرض الكل
+          </Link>
+        </div>
+        <ul className="space-y-2 text-sm">
+          {(projects.data ?? [])
+            .filter((p) => !p.parent_id)
+            .slice(0, 6)
+            .map((p) => (
+              <li key={p.id}>
+                <Link to="/projects/$id" params={{ id: p.id }} className="font-semibold hover:text-primary">
+                  {p.title}
+                </Link>
+                <span className="text-muted-foreground"> — {p.org_unit || "عام"}</span>
+              </li>
+            ))}
+          {!(projects.data ?? []).some((p) => !p.parent_id) && (
+            <p className="text-muted-foreground">لا يوجد مشروع مشترك في قسمك بعد</p>
+          )}
+        </ul>
+      </div>
     </div>
   );
 }
@@ -124,6 +149,7 @@ function Dashboard() {
   const employees = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
   const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches.list });
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks.list });
+  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects.list });
 
   const emp = employees.data ?? [];
   const br = branches.data ?? [];
@@ -244,6 +270,31 @@ function Dashboard() {
             </div>
           ) : null}
         </div>
+      </div>
+
+      <div className="panel p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-bold">عمل الفريق</h2>
+          <Link to="/projects" className="text-xs font-semibold text-primary">
+            إدارة المشاريع
+          </Link>
+        </div>
+        <ul className="divide-y text-sm">
+          {(projects.data ?? [])
+            .filter((p) => !p.parent_id)
+            .slice(0, 8)
+            .map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 py-2">
+                <Link to="/projects/$id" params={{ id: p.id }} className="font-semibold hover:text-primary">
+                  {p.title}
+                </Link>
+                <span className="text-muted-foreground">{p.org_unit || "عام"}</span>
+              </li>
+            ))}
+        </ul>
+        {!(projects.data ?? []).some((p) => !p.parent_id) && (
+          <p className="text-sm text-muted-foreground">عندما يضيف قسم مشروعاً سيظهر هنا تلقائياً.</p>
+        )}
       </div>
     </div>
   );

@@ -63,6 +63,7 @@ export type Project = {
   org_unit: string;
   parent_id: string | null;
   predecessor_id: string | null;
+  created_by?: string | null;
   position: number;
   created_at: string;
 };

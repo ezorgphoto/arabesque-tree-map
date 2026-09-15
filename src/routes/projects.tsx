@@ -27,7 +27,7 @@ import {
 
 export const Route = createFileRoute("/projects")({
   component: ProjectsPage,
-  head: () => ({ meta: [{ title: "إدارة المشاريع | نظام الإدارة التنفيذية" }] }),
+  head: () => ({ meta: [{ title: "عمل الفريق | نظام الإدارة التنفيذية" }] }),
 });
 
 const empty: Partial<Project> = {
@@ -37,23 +37,31 @@ const empty: Partial<Project> = {
   org_unit: "",
   parent_id: null,
   predecessor_id: null,
+  manager_id: null,
 };
 
 function ProjectsPage() {
-  const { isLeadership, isSupervisor, profile } = useAuth();
-  const canEdit = isLeadership || isSupervisor;
+  const { profile } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Project>>(empty);
   const list = useQuery({ queryKey: ["projects"], queryFn: api.projects.list });
+  const people = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
   const roots = (list.data ?? []).filter((p) => !p.parent_id);
+  const personName = (id: string | null) =>
+    people.data?.find((e) => e.id === id)?.full_name ?? "غير مسند";
 
   const save = useMutation({
-    mutationFn: (row: Partial<Project>) => api.projects.create(row),
+    mutationFn: (row: Partial<Project>) =>
+      api.projects.create({
+        ...row,
+        created_by: profile?.id,
+        org_unit: row.org_unit || profile?.org_unit || profile?.department || "",
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["projects"] });
       setOpen(false);
-      toast.success("تم إنشاء المشروع");
+      toast.success("ظهر المشروع للقسم وللمسند إليه وللمسؤول");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -63,22 +71,24 @@ function ProjectsPage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-3xl font-extrabold">
-            <FolderKanban className="size-7 text-primary" /> إدارة المشاريع
+            <FolderKanban className="size-7 text-primary" /> عمل الفريق
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            خطط المشاريع وتسلسل المراحل داخل المنظومة، مع ربط كل مرحلة بما قبلها.
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            هنا العمل المشترك. مشروع القسم يراه زملاء القسم والمسؤول. إذا أسندته لشخص يظهر في قائمته.
           </p>
         </div>
-        {canEdit && (
-          <Button
-            onClick={() => {
-              setForm({ ...empty, org_unit: profile?.org_unit || profile?.department || "" });
-              setOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> مشروع جديد
-          </Button>
-        )}
+        <Button
+          onClick={() => {
+            setForm({
+              ...empty,
+              org_unit: profile?.org_unit || profile?.department || "",
+              manager_id: profile?.id ?? null,
+            });
+            setOpen(true);
+          }}
+        >
+          <Plus className="size-4" /> مشروع جديد
+        </Button>
       </header>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -87,7 +97,7 @@ function ProjectsPage() {
             key={p.id}
             to="/projects/$id"
             params={{ id: p.id }}
-            className="panel block p-5 transition-colors hover:bg-accent/40"
+            className="panel block p-5 transition-colors hover:bg-muted/60"
           >
             <div className="flex items-start justify-between gap-2">
               <h2 className="text-lg font-extrabold">{p.title}</h2>
@@ -97,19 +107,19 @@ function ProjectsPage() {
             </div>
             <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{p.description || "بدون وصف"}</p>
             <p className="mt-3 text-xs text-muted-foreground">
-              {p.org_unit || "عام"} · {p.start_date || "بدون بداية"} → {p.end_date || "بدون نهاية"}
+              {p.org_unit || "عام"} · مسند إلى {personName(p.manager_id)}
             </p>
           </Link>
         ))}
         {!roots.length && (
-          <p className="text-sm text-muted-foreground">لا توجد مشاريع بعد. أنشئ مشروعاً لتبدأ التسلسل.</p>
+          <p className="text-sm text-muted-foreground">لا يوجد عمل مشترك بعد. أنشئ أول مشروع لقسمك.</p>
         )}
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent dir="rtl">
           <DialogHeader>
-            <DialogTitle>مشروع جديد</DialogTitle>
+            <DialogTitle>مشروع مشترك</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
             <div>
@@ -124,25 +134,26 @@ function ProjectsPage() {
               />
             </div>
             <div>
-              <Label>القسم / اللجنة</Label>
+              <Label>القسم</Label>
               <Input
                 value={form.org_unit ?? ""}
                 onChange={(e) => setForm({ ...form, org_unit: e.target.value })}
               />
             </div>
             <div>
-              <Label>الحالة</Label>
+              <Label>يسنده إلى</Label>
               <Select
-                value={form.status ?? "planned"}
-                onValueChange={(v) => setForm({ ...form, status: v })}
+                value={form.manager_id ?? "none"}
+                onValueChange={(v) => setForm({ ...form, manager_id: v === "none" ? null : v })}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="اختر شخصاً" />
                 </SelectTrigger>
                 <SelectContent dir="rtl">
-                  {Object.entries(PROJECT_STATUSES).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v}
+                  <SelectItem value="none">بدون إسناد بعد</SelectItem>
+                  {(people.data ?? []).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.full_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -154,7 +165,7 @@ function ProjectsPage() {
               إلغاء
             </Button>
             <Button disabled={!form.title?.trim() || save.isPending} onClick={() => save.mutate(form)}>
-              إنشاء
+              إنشاء ومشاركة
             </Button>
           </DialogFooter>
         </DialogContent>

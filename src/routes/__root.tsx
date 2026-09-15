@@ -34,12 +34,12 @@ import { AuthProvider, ROLE_LABEL, useAuth } from "@/lib/auth";
 
 const NAV = [
   { to: "/", label: "لوحة القيادة", icon: LayoutDashboard, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/employees", label: "الأعضاء", icon: Users, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/tasks", label: "المهام", icon: KanbanSquare, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/planner", label: "المخطط الزمني", icon: CalendarRange, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/reports", label: "مركز التقارير", icon: FileBarChart2, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/projects", label: "المشاريع", icon: FolderKanban, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/tasks", label: "مهامي", icon: KanbanSquare, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/projects", label: "عمل الفريق", icon: FolderKanban, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/planner", label: "المخطط المشترك", icon: CalendarRange, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/employees", label: "الزملاء", icon: Users, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network, roles: ["manager", "deputy"] },
+  { to: "/reports", label: "مركز التقارير", icon: FileBarChart2, roles: ["manager", "deputy"] },
   { to: "/permissions", label: "الصلاحيات", icon: Shield, roles: ["manager"] },
   { to: "/map", label: "خريطة الفروع", icon: MapPin, roles: ["manager", "deputy"] },
   { to: "/notes", label: "الملاحظات", icon: NotebookPen, roles: ["manager", "deputy"] },
@@ -47,9 +47,9 @@ const NAV = [
 ] as const;
 
 const NAV_GROUPS = [
-  { title: "العمل", paths: ["/", "/tasks", "/planner"] },
-  { title: "المنظومة", paths: ["/hierarchy", "/employees", "/projects", "/reports"] },
-  { title: "الإدارة", paths: ["/permissions", "/map", "/notes", "/assistant"] },
+  { title: "يومي", paths: ["/", "/tasks", "/projects", "/planner"] },
+  { title: "الناس", paths: ["/employees", "/hierarchy"] },
+  { title: "إدارة", paths: ["/reports", "/permissions", "/map", "/notes", "/assistant"] },
 ] as const;
 
 function NotFoundComponent() {

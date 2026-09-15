@@ -25,14 +25,19 @@ export const Route = createFileRoute("/projects/$id")({
 
 function ProjectDetailPage() {
   const { id } = Route.useParams();
-  const { isLeadership, isSupervisor } = useAuth();
-  const canEdit = isLeadership || isSupervisor;
+  const { isLeadership, isSupervisor, profile } = useAuth();
+  const people = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
   const qc = useQueryClient();
   const [childTitle, setChildTitle] = useState("");
   const list = useQuery({ queryKey: ["projects"], queryFn: api.projects.list });
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks.list });
   const all = list.data ?? [];
   const project = all.find((p) => p.id === id);
+  const canEdit =
+    isLeadership ||
+    isSupervisor ||
+    project?.created_by === profile?.id ||
+    project?.manager_id === profile?.id;
   const children = useMemo(
     () => all.filter((p) => p.parent_id === id).sort((a, b) => a.position - b.position),
     [all, id],
@@ -56,6 +61,8 @@ function ProjectDetailPage() {
         title: childTitle.trim(),
         parent_id: id,
         org_unit: project?.org_unit ?? "",
+        manager_id: project?.manager_id ?? null,
+        created_by: profile?.id,
         status: "planned",
         position: children.length,
         predecessor_id: children.at(-1)?.id ?? null,
@@ -89,7 +96,12 @@ function ProjectDetailPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-extrabold">{project.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{project.org_unit || "عام"}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {project.org_unit || "عام"}
+            {project.manager_id
+              ? ` · مسند إلى ${people.data?.find((e) => e.id === project.manager_id)?.full_name ?? ""}`
+              : ""}
+          </p>
         </div>
         {canEdit && (
           <Button
@@ -114,6 +126,26 @@ function ProjectDetailPage() {
             defaultValue={project.description}
             onBlur={(e) => canEdit && save.mutate({ description: e.target.value })}
           />
+        </div>
+        <div>
+          <Label>يسنده إلى</Label>
+          <Select
+            defaultValue={project.manager_id ?? "none"}
+            onValueChange={(v) => canEdit && save.mutate({ manager_id: v === "none" ? null : v })}
+            disabled={!canEdit}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="اختر شخصاً" />
+            </SelectTrigger>
+            <SelectContent dir="rtl">
+              <SelectItem value="none">بدون إسناد</SelectItem>
+              {(people.data ?? []).map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Label>الحالة</Label>
