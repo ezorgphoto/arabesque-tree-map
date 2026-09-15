@@ -35,6 +35,19 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+function normalizeProfile(row: AuthProfile): AuthProfile {
+  const role = row.app_role;
+  if (role === "manager" || role === "deputy" || role === "supervisor" || role === "member") {
+    return { ...row, app_role: role };
+  }
+  const title = `${row.job_title ?? ""}`;
+  if (title.includes("نائب مسئول")) return { ...row, app_role: "deputy" };
+  if (title.includes("مسئول الاسرة") || title.includes("مسؤول الاسرة")) {
+    return { ...row, app_role: "manager" };
+  }
+  return { ...row, app_role: "member" };
+}
+
 async function loadProfile(): Promise<AuthProfile | null> {
   const { data: authData } = await supabase.auth.getUser();
   const user = authData.user;
@@ -44,14 +57,14 @@ async function loadProfile(): Promise<AuthProfile | null> {
     rpc: (fn: string) => Promise<{ data: AuthProfile | AuthProfile[] | null; error: { message: string } | null }>;
   }).rpc("my_employee");
   const rpcRow = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
-  if (!rpc.error && rpcRow?.id) return rpcRow;
+  if (!rpc.error && rpcRow?.id) return normalizeProfile(rpcRow);
 
   const byId = await supabase.from("employees").select("*").eq("user_id", user.id).maybeSingle();
-  if (!byId.error && byId.data) return byId.data as AuthProfile;
+  if (!byId.error && byId.data) return normalizeProfile(byId.data as AuthProfile);
 
   if (user.email) {
     const byEmail = await supabase.from("employees").select("*").ilike("email", user.email).maybeSingle();
-    if (!byEmail.error && byEmail.data) return byEmail.data as AuthProfile;
+    if (!byEmail.error && byEmail.data) return normalizeProfile(byEmail.data as AuthProfile);
   }
 
   console.error(rpc.error ?? byId.error);
@@ -72,17 +85,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      if (data.session) setProfile(await loadProfile());
-      setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, next) => {
+    let seq = 0;
+
+    const applySession = async (next: Session | null) => {
+      const n = ++seq;
       setSession(next);
-      if (next) setProfile(await loadProfile());
-      else setProfile(null);
+      setLoading(true);
+      const nextProfile = next ? await loadProfile() : null;
+      if (!mounted || n !== seq) return;
+      setProfile(nextProfile);
       setLoading(false);
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      void applySession(data.session);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      void applySession(next);
     });
     return () => {
       mounted = false;

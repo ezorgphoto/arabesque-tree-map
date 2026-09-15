@@ -260,11 +260,7 @@ function AuthGate() {
   if (!session && !isLogin) return <Navigate to="/login" />;
   if (session && isLogin) return <Navigate to="/" />;
   if (!session && isLogin) return <Outlet />;
-  if (session && !profile) {
-    return (
-      <UnlinkedAccount />
-    );
-  }
+  if (session && !profile) return <UnlinkedAccount />;
   return <Shell />;
 }
 
