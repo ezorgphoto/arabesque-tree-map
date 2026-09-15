@@ -84,6 +84,11 @@ function MemberHome({ isSupervisor }: { isSupervisor: boolean }) {
             : ""}
         </p>
       </header>
+      {(tasks.error || people.error) && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
+          تعذر جلب البيانات: {(tasks.error ?? people.error)?.message}
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-3">
         <div className="panel p-5">
           <p className="text-xs font-semibold text-muted-foreground">
@@ -140,6 +145,7 @@ function Dashboard() {
   const emp = employees.data ?? [];
   const br = branches.data ?? [];
   const tk = tasks.data ?? [];
+  const fetchError = employees.error ?? branches.error ?? tasks.error;
 
   const payroll = emp.reduce((s, e) => s + Number(e.salary), 0);
   const done = tk.filter((t) => t.status === "done").length;
@@ -152,7 +158,7 @@ function Dashboard() {
 
   const byDept = Object.entries(
     emp.reduce<Record<string, number>>((acc, e) => {
-      const key = e.department || "غير محدد";
+      const key = e.org_unit || e.department || "غير محدد";
       acc[key] = (acc[key] ?? 0) + 1;
       return acc;
     }, {}),
@@ -168,26 +174,90 @@ function Dashboard() {
       <header>
         <h1 className="text-3xl font-extrabold">لوحة القيادة</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          نظرة شاملة على أداء المؤسسة وفروعها في الوقت الحالي.
+          نظرة سريعة على الأعضاء والمهام والفروع.
         </p>
       </header>
 
+      {fetchError ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
+          تعذر جلب البيانات: {fetchError instanceof Error ? fetchError.message : "خطأ غير معروف"}
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="إجمالي الموظفين" value={String(emp.length)} hint="مسجلون في النظام" icon={Users} />
-        <Kpi label="عدد الفروع" value={String(br.length)} hint="فروع نشطة" icon={Building2} />
+        <Kpi
+          label="إجمالي الأعضاء"
+          value={employees.isLoading ? "…" : String(emp.length)}
+          hint="مسجلون في النظام"
+          icon={Users}
+        />
+        <Kpi
+          label="عدد الفروع"
+          value={branches.isLoading ? "…" : String(br.length)}
+          hint="فروع نشطة"
+          icon={Building2}
+        />
         <Kpi
           label="المهام المكتملة"
-          value={`${done} / ${tk.length}`}
+          value={tasks.isLoading ? "…" : `${done} / ${tk.length}`}
           hint="خلال الفترة الحالية"
           icon={CheckCircle2}
         />
-        <Kpi label="إجمالي الرواتب" value={`${currency(payroll)} ر.س`} hint="شهرياً" icon={Wallet} />
+        <Kpi
+          label="إجمالي الرواتب"
+          value={employees.isLoading ? "…" : `${currency(payroll)} ر.س`}
+          hint="شهرياً"
+          icon={Wallet}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="panel p-5 lg:col-span-2">
+          <h2 className="mb-3 text-lg font-bold">الأعضاء</h2>
+          {emp.length ? (
+            <ul className="divide-y text-sm">
+              {emp.slice(0, 12).map((e) => (
+                <li key={e.id} className="flex items-center justify-between gap-3 py-2">
+                  <span className="font-semibold">{e.full_name}</span>
+                  <span className="truncate text-muted-foreground">
+                    {e.job_title || e.org_unit || e.department || "عضو"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {employees.isLoading ? "جارٍ التحميل…" : "لا تظهر أسماء بعد. حدّث الصفحة بعد تشغيل أمر SQL التالي إن لزم."}
+            </p>
+          )}
+        </div>
+
+        <div className="panel p-5">
+          <h2 className="mb-4 text-lg font-bold">التوزيع حسب الوحدة</h2>
+          {byDept.length ? (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={byDept} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90}>
+                    {byDept.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">سيظهر التوزيع عند عودة البيانات.</p>
+          )}
+        </div>
+      </div>
+
+      {byBranch.length ? (
+        <div className="panel p-5">
           <h2 className="mb-4 text-lg font-bold">الإيرادات حسب الفرع</h2>
-          <div className="h-72">
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byBranch}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -200,28 +270,11 @@ function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-
-        <div className="panel p-5">
-          <h2 className="mb-4 text-lg font-bold">توزيع الموظفين حسب الإدارة</h2>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={byDept} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90}>
-                  {byDept.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+      ) : null}
 
       <div className="panel p-5">
         <h2 className="mb-4 text-lg font-bold">حالة المهام</h2>
-        <div className="h-64">
+        <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={byStatus}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

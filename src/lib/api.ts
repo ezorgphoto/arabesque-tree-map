@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { rememberAccessToken, supabase } from "@/integrations/supabase/client";
 
 export type Branch = {
   id: string;
@@ -108,10 +108,18 @@ function unwrap<T>(res: { data: T | null; error: { message: string } | null }): 
   return res.data as T;
 }
 
+async function withSession() {
+  if (typeof window === "undefined") return;
+  const { data } = await supabase.auth.getSession();
+  rememberAccessToken(data.session?.access_token ?? null);
+}
+
 export const api = {
   branches: {
-    list: async () =>
-      unwrap<Branch[]>(await supabase.from("branches").select("*").order("created_at")),
+    list: async () => {
+      await withSession();
+      return unwrap<Branch[]>(await supabase.from("branches").select("*").order("created_at"));
+    },
     create: async (row: Partial<Branch>) =>
       unwrap(await supabase.from("branches").insert(row as never).select().single()),
     update: async (id: string, row: Partial<Branch>) =>
@@ -122,8 +130,10 @@ export const api = {
     },
   },
   employees: {
-    list: async () =>
-      unwrap<Employee[]>(await supabase.from("employees").select("*").order("created_at")),
+    list: async () => {
+      await withSession();
+      return unwrap<Employee[]>(await supabase.from("employees").select("*").order("created_at"));
+    },
     create: async (row: Partial<Employee>) =>
       unwrap(await supabase.from("employees").insert(row as never).select().single()),
     update: async (id: string, row: Partial<Employee>) =>
@@ -134,8 +144,10 @@ export const api = {
     },
   },
   tasks: {
-    list: async () =>
-      unwrap<Task[]>(await supabase.from("tasks").select("*").order("position")),
+    list: async () => {
+      await withSession();
+      return unwrap<Task[]>(await supabase.from("tasks").select("*").order("position"));
+    },
     create: async (row: Partial<Task>) =>
       unwrap(await supabase.from("tasks").insert(row as never).select().single()),
     update: async (id: string, row: Partial<Task>) =>
@@ -146,8 +158,10 @@ export const api = {
     },
   },
   orgNodes: {
-    list: async () =>
-      unwrap<OrgNode[]>(await supabase.from("org_nodes").select("*").order("position")),
+    list: async () => {
+      await withSession();
+      return unwrap<OrgNode[]>(await supabase.from("org_nodes").select("*").order("position"));
+    },
     create: async (row: Partial<OrgNode>) =>
       unwrap(await supabase.from("org_nodes").insert(row as never).select().single()),
     update: async (id: string, row: Partial<OrgNode>) =>
@@ -158,10 +172,12 @@ export const api = {
     },
   },
   projects: {
-    list: async () =>
-      unwrap<Project[]>(
+    list: async () => {
+      await withSession();
+      return unwrap<Project[]>(
         await supabase.from("projects").select("*").order("position").order("created_at"),
-      ),
+      );
+    },
     create: async (row: Partial<Project>) =>
       unwrap(await supabase.from("projects").insert(row as never).select().single()),
     update: async (id: string, row: Partial<Project>) =>
@@ -172,13 +188,15 @@ export const api = {
     },
   },
   reports: {
-    list: async () =>
-      unwrap<Report[]>(
+    list: async () => {
+      await withSession();
+      return unwrap<Report[]>(
         (await supabase
           .from("reports")
           .select("*")
           .order("created_at", { ascending: false })) as never,
-      ),
+      );
+    },
 
     create: async (row: Partial<Report>) =>
       unwrap(await supabase.from("reports").insert(row as never).select().single()),

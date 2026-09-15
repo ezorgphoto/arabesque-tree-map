@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { rememberAccessToken, supabase } from "@/integrations/supabase/client";
 
 export type ScheduleBlock = {
   id: string;
@@ -40,14 +40,19 @@ export const hhmm = (value: string) => (value ?? "").slice(0, 5);
 export const pad = (n: number) => `${n}`.padStart(2, "0");
 
 export const scheduleApi = {
-  list: async () =>
-    unwrap<ScheduleBlock[]>(
+  list: async () => {
+    if (typeof window !== "undefined") {
+      const { data } = await supabase.auth.getSession();
+      rememberAccessToken(data.session?.access_token ?? null);
+    }
+    return unwrap<ScheduleBlock[]>(
       (await supabase
         .from("weekly_schedule")
         .select("*")
         .order("day_of_week")
         .order("start_time")) as never,
-    ),
+    );
+  },
   create: async (row: Partial<ScheduleBlock>) =>
     unwrap((await supabase.from("weekly_schedule").insert(row as never).select().single()) as never),
   update: async (id: string, row: Partial<ScheduleBlock>) =>
@@ -66,14 +71,19 @@ export const scheduleApi = {
 };
 
 export const notificationsApi = {
-  list: async () =>
-    unwrap<AppNotification[]>(
+  list: async () => {
+    if (typeof window !== "undefined") {
+      const { data } = await supabase.auth.getSession();
+      rememberAccessToken(data.session?.access_token ?? null);
+    }
+    return unwrap<AppNotification[]>(
       (await supabase
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(30)) as never,
-    ),
+    );
+  },
   markRead: async (id: string) => {
     const { error } = await supabase
       .from("notifications")

@@ -168,6 +168,12 @@ function EmployeesPage() {
         )}
       </header>
 
+      {employees.error ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
+          تعذر جلب الأعضاء: {employees.error.message}
+        </div>
+      ) : null}
+
       <div className="panel p-4">
         <div className="relative mb-4 max-w-sm">
           <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

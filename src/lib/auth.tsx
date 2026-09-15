@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
-import { supabase } from "@/integrations/supabase/client";
+import { rememberAccessToken, supabase } from "@/integrations/supabase/client";
 import type { Employee } from "@/lib/api";
 
 export type AppRole = "manager" | "deputy" | "supervisor" | "member";
@@ -90,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const applySession = async (next: Session | null) => {
       const n = ++seq;
+      rememberAccessToken(next?.access_token ?? null);
       setSession(next);
       setLoading(true);
       const nextProfile = next ? await loadProfile() : null;
@@ -125,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       signOut: async () => {
         await supabase.auth.signOut();
+        rememberAccessToken(null);
         setProfile(null);
       },
     }),

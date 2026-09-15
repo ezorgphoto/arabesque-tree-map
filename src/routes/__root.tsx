@@ -46,6 +46,12 @@ const NAV = [
   { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit, roles: ["manager", "deputy"] },
 ] as const;
 
+const NAV_GROUPS = [
+  { title: "العمل", paths: ["/", "/tasks", "/planner"] },
+  { title: "المنظومة", paths: ["/hierarchy", "/employees", "/projects", "/reports"] },
+  { title: "الإدارة", paths: ["/permissions", "/map", "/notes", "/assistant"] },
+] as const;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -156,8 +162,8 @@ function Shell() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-sidebar p-5 text-sidebar-foreground md:flex">
-        <div className="mb-8 flex items-center gap-3">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar p-4 text-sidebar-foreground md:flex">
+        <div className="mb-6 flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
             <Building2 className="size-5" />
           </div>
@@ -166,24 +172,39 @@ function Shell() {
             <p className="text-xs text-sidebar-foreground/60">التنفيذية</p>
           </div>
         </div>
-        <nav className="flex flex-col gap-1">
-          {items.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              activeOptions={{ exact: item.to === "/" }}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              activeProps={{
-                className:
-                  "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
-              }}
-            >
-              <item.icon className="size-4" />
-              {item.label}
-            </Link>
-          ))}
+        <nav className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          {NAV_GROUPS.map((group) => {
+            const groupItems = items.filter((item) =>
+              (group.paths as readonly string[]).includes(item.to),
+            );
+            if (!groupItems.length) return null;
+            return (
+              <div key={group.title}>
+                <p className="mb-1 px-3 text-[11px] font-bold tracking-wide text-sidebar-foreground/45">
+                  {group.title}
+                </p>
+                <div className="flex flex-col gap-0.5">
+                  {groupItems.map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      activeOptions={{ exact: item.to === "/" }}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      activeProps={{
+                        className:
+                          "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
+                      }}
+                    >
+                      <item.icon className="size-4" />
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </nav>
-        <div className="mt-auto space-y-2 text-xs text-sidebar-foreground/70">
+        <div className="mt-4 space-y-1 border-t border-sidebar-foreground/10 pt-3 text-xs text-sidebar-foreground/70">
           <p className="font-bold text-sidebar-foreground">{profile?.full_name}</p>
           <p>{role ? ROLE_LABEL[role] : ""}</p>
           <p>{profile?.org_unit || profile?.department || profile?.job_title}</p>
