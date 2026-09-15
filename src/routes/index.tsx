@@ -1,20 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Users, Building2, CheckCircle2, Wallet } from "lucide-react";
 import { api, currency, TASK_COLUMNS } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -31,8 +16,6 @@ export const Route = createFileRoute("/")({
     ],
   }),
 });
-
-const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
 function Kpi({
   label,
@@ -150,12 +133,6 @@ function Dashboard() {
   const payroll = emp.reduce((s, e) => s + Number(e.salary), 0);
   const done = tk.filter((t) => t.status === "done").length;
 
-  const byBranch = br.map((b) => ({
-    name: b.name,
-    الإيرادات: Number(b.revenue),
-    الموظفون: emp.filter((e) => e.branch_id === b.id).length,
-  }));
-
   const byDept = Object.entries(
     emp.reduce<Record<string, number>>((acc, e) => {
       const key = e.org_unit || e.department || "غير محدد";
@@ -211,12 +188,12 @@ function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="panel p-5 lg:col-span-2">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="panel p-5">
           <h2 className="mb-3 text-lg font-bold">الأعضاء</h2>
           {emp.length ? (
             <ul className="divide-y text-sm">
-              {emp.slice(0, 12).map((e) => (
+              {emp.slice(0, 10).map((e) => (
                 <li key={e.id} className="flex items-center justify-between gap-3 py-2">
                   <span className="font-semibold">{e.full_name}</span>
                   <span className="truncate text-muted-foreground">
@@ -227,63 +204,45 @@ function Dashboard() {
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {employees.isLoading ? "جارٍ التحميل…" : "لا تظهر أسماء بعد. حدّث الصفحة بعد تشغيل أمر SQL التالي إن لزم."}
+              {employees.isLoading ? "جارٍ التحميل…" : "لا تظهر أسماء بعد."}
             </p>
           )}
         </div>
 
         <div className="panel p-5">
-          <h2 className="mb-4 text-lg font-bold">التوزيع حسب الوحدة</h2>
+          <h2 className="mb-3 text-lg font-bold">المهام</h2>
+          <ul className="space-y-3">
+            {byStatus.map((row) => {
+              const max = Math.max(tk.length, 1);
+              return (
+                <li key={row.name}>
+                  <div className="mb-1 flex justify-between text-sm">
+                    <span className="font-semibold">{row.name}</span>
+                    <span className="text-muted-foreground">{row.المهام}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{ width: `${Math.round((row.المهام / max) * 100)}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
           {byDept.length ? (
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={byDept} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90}>
-                    {byDept.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="mt-5 border-t pt-4">
+              <h3 className="mb-2 text-sm font-bold">حسب الوحدة</h3>
+              <ul className="space-y-1 text-sm">
+                {byDept.map((d) => (
+                  <li key={d.name} className="flex justify-between gap-2">
+                    <span>{d.name}</span>
+                    <span className="font-semibold">{d.value}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">سيظهر التوزيع عند عودة البيانات.</p>
-          )}
-        </div>
-      </div>
-
-      {byBranch.length ? (
-        <div className="panel p-5">
-          <h2 className="mb-4 text-lg font-bold">الإيرادات حسب الفرع</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byBranch}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} orientation="right" />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="الإيرادات" fill="var(--chart-1)" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="panel p-5">
-        <h2 className="mb-4 text-lg font-bold">حالة المهام</h2>
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={byStatus}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} orientation="right" />
-              <Tooltip />
-              <Line type="monotone" dataKey="المهام" stroke="var(--chart-3)" strokeWidth={3} />
-            </LineChart>
-          </ResponsiveContainer>
+          ) : null}
         </div>
       </div>
     </div>

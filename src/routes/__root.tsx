@@ -162,68 +162,67 @@ function Shell() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar p-4 text-sidebar-foreground md:flex">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-            <Building2 className="size-5" />
+      <aside className="sticky top-0 hidden h-screen w-[15.25rem] shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground md:flex">
+        <div className="flex items-center gap-3 px-4 py-5">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <Building2 className="size-4" />
           </div>
           <div>
             <p className="text-sm font-extrabold leading-tight">نظام الإدارة</p>
-            <p className="text-xs text-sidebar-foreground/60">التنفيذية</p>
+            <p className="text-[11px] text-sidebar-foreground/55">التنفيذية</p>
           </div>
         </div>
-        <nav className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+        <nav className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-2 pb-3">
           {NAV_GROUPS.map((group) => {
             const groupItems = items.filter((item) =>
               (group.paths as readonly string[]).includes(item.to),
             );
             if (!groupItems.length) return null;
             return (
-              <div key={group.title}>
-                <p className="mb-1 px-3 text-[11px] font-bold tracking-wide text-sidebar-foreground/45">
+              <div key={group.title} className="space-y-0.5">
+                <p className="px-3 pb-1 text-[10px] font-bold text-sidebar-foreground/40">
                   {group.title}
                 </p>
-                <div className="flex flex-col gap-0.5">
-                  {groupItems.map((item) => (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      activeOptions={{ exact: item.to === "/" }}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      activeProps={{
-                        className:
-                          "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
-                      }}
-                    >
-                      <item.icon className="size-4" />
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
+                {groupItems.map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    activeOptions={{ exact: item.to === "/" }}
+                    className="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] font-semibold text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    activeProps={{
+                      className:
+                        "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
+                    }}
+                  >
+                    <item.icon className="size-4 shrink-0" />
+                    {item.label}
+                  </Link>
+                ))}
               </div>
             );
           })}
         </nav>
-        <div className="mt-4 space-y-1 border-t border-sidebar-foreground/10 pt-3 text-xs text-sidebar-foreground/70">
-          <p className="font-bold text-sidebar-foreground">{profile?.full_name}</p>
-          <p>{role ? ROLE_LABEL[role] : ""}</p>
-          <p>{profile?.org_unit || profile?.department || profile?.job_title}</p>
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            className="flex items-center gap-1 pt-2 font-semibold text-sidebar-foreground/80 hover:text-sidebar-foreground"
-          >
-            <LogOut className="size-3.5" /> خروج
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className="mx-3 mb-4 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          <LogOut className="size-3.5" /> خروج
+        </button>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-2 backdrop-blur md:px-8">
-          <p className="truncate text-sm font-bold text-muted-foreground">
-            {profile?.full_name} — {role ? ROLE_LABEL[role] : "نظام الإدارة التنفيذية"}
-          </p>
-          <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+        <header className="flex items-center justify-between gap-3 border-b bg-card px-4 py-3 md:px-6">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-extrabold">{profile?.full_name}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {role ? ROLE_LABEL[role] : ""}
+              {profile?.org_unit || profile?.department
+                ? ` · ${profile?.org_unit || profile?.department}`
+                : ""}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             <NotificationBell />
             <button
               type="button"
@@ -234,20 +233,20 @@ function Shell() {
             </button>
           </div>
         </header>
-        <nav className="flex gap-1 overflow-x-auto bg-sidebar p-2 md:hidden">
+        <nav className="no-scrollbar grid grid-cols-3 gap-1 border-b bg-card p-2 md:hidden">
           {items.map((item) => (
             <Link
               key={item.to}
               to={item.to}
               activeOptions={{ exact: item.to === "/" }}
-              className="whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold text-sidebar-foreground/75"
-              activeProps={{ className: "bg-sidebar-primary text-sidebar-primary-foreground" }}
+              className="truncate rounded-md px-2 py-2 text-center text-[11px] font-semibold text-muted-foreground"
+              activeProps={{ className: "bg-primary text-primary-foreground" }}
             >
               {item.label}
             </Link>
           ))}
         </nav>
-        <main className="min-w-0 flex-1 p-4 md:p-8">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">
           <Outlet />
         </main>
       </div>
