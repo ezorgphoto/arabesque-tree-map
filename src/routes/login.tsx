@@ -16,10 +16,19 @@ export const Route = createFileRoute("/login")({
   }),
 });
 
+function arabicAuthError(message: string) {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login")) return "البريد أو كلمة المرور غير صحيحة";
+  if (m.includes("email not confirmed")) return "البريد غير مؤكد بعد. راجع صندوق الوارد أو عطّل تأكيد البريد في سوبربيس";
+  if (m.includes("user already registered")) return "هذا البريد مفعّل مسبقاً. استخدم دخول";
+  if (m.includes("signup is disabled")) return "التسجيل مغلق. اطلب من المسؤول تفعيل حسابك";
+  return message;
+}
+
 function LoginPage() {
   const nav = useNavigate();
   const { refresh } = useAuth();
-  const [mode, setMode] = useState<"in" | "up">("in");
+  const [mode, setMode] = useState<"in" | "activate">("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
@@ -27,22 +36,27 @@ function LoginPage() {
   const submit = async () => {
     const mail = email.trim().toLowerCase();
     if (!mail || password.length < 6) {
-      toast.error("أدخل بريداً صحيحاً وكلمة مرور من 6 أحرف على الأقل");
+      toast.error("أدخل البريد الذي سجّله المسؤول، وكلمة مرور من 6 أحرف على الأقل");
       return;
     }
     setPending(true);
     try {
-      if (mode === "up") {
-        const { error } = await supabase.auth.signUp({ email: mail, password });
-        if (error) throw error;
-        toast.success("تم إنشاء الحساب. إن لم يفتح تلقائياً سجّل الدخول.");
+      if (mode === "activate") {
+        const allowed = await supabase.rpc("can_activate_account" as never, { p_email: mail } as never);
+        if (allowed.error) throw new Error(allowed.error.message);
+        if (!allowed.data) {
+          toast.error("هذا البريد غير مسجّل في المنظومة. اطلب من المسؤول حفظه في بطاقتك أولاً");
+          return;
+        }
+        const { error: upError } = await supabase.auth.signUp({ email: mail, password });
+        if (upError) throw upError;
       }
       const { error } = await supabase.auth.signInWithPassword({ email: mail, password });
       if (error) throw error;
       await refresh();
       await nav({ to: "/" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "تعذّر الدخول");
+      toast.error(e instanceof Error ? arabicAuthError(e.message) : "تعذّر الدخول");
     } finally {
       setPending(false);
     }
@@ -58,35 +72,43 @@ function LoginPage() {
           <div>
             <h1 className="text-xl font-extrabold">نظام الإدارة التنفيذية</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {mode === "in" ? "سجّل الدخول بحسابك" : "أنشئ حساباً بالبريد الذي سجّله المسؤول"}
+              {mode === "in"
+                ? "دخول حقيقي بالبريد وكلمة المرور"
+                : "أول مرة فقط: فعّل حسابك بنفس البريد المسجّل لك"}
             </p>
           </div>
         </div>
         <div className="grid gap-3">
           <div>
-            <Label>البريد</Label>
-            <Input dir="ltr" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Label>البريد المسجّل في بطاقتك</Label>
+            <Input
+              dir="ltr"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+            />
           </div>
           <div>
-            <Label>كلمة المرور</Label>
+            <Label>{mode === "in" ? "كلمة المرور" : "اختر كلمة مرور"}</Label>
             <Input
               dir="ltr"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
+              onKeyDown={(e) => e.key === "Enter" && void submit()}
             />
           </div>
-          <Button disabled={pending} onClick={submit}>
-            {mode === "in" ? "دخول" : "إنشاء حساب ودخول"}
+          <Button disabled={pending} onClick={() => void submit()}>
+            {mode === "in" ? "دخول" : "تفعيل الحساب ودخول"}
           </Button>
         </div>
         <button
           type="button"
           className="w-full text-center text-sm font-semibold text-primary"
-          onClick={() => setMode(mode === "in" ? "up" : "in")}
+          onClick={() => setMode(mode === "in" ? "activate" : "in")}
         >
-          {mode === "in" ? "ليس لديك حساب؟ إنشاء حساب" : "لديك حساب؟ تسجيل الدخول"}
+          {mode === "in" ? "أول مرة؟ تفعيل الحساب" : "لدي حساب، أريد الدخول"}
         </button>
       </div>
     </div>

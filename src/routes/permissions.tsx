@@ -55,7 +55,7 @@ function PermissionsPage() {
           <Shield className="size-7 text-primary" /> الصلاحيات والحسابات
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          عيّن الدور والقسم والبريد. بعد حفظ البريد يطلب من الشخص إنشاء حساب من صفحة الدخول بنفس البريد.
+          عيّن الدور والقسم والبريد لكل شخص. هو يدخل من صفحة الدخول بنفس البريد، وفي أول مرة يختار كلمة مروره.
         </p>
       </header>
       <div className="panel overflow-x-auto p-4">
