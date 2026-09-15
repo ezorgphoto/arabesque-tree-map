@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, currency, STATUSES, type Employee } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { ROLE_LABEL, useAuth } from "@/lib/auth";
 import { listReports, formatDate } from "@/lib/reports-hub";
 import { DEPARTMENT_LABELS } from "@/lib/report-templates";
 import { Button } from "@/components/ui/button";
@@ -26,14 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 export const Route = createFileRoute("/employees")({
   component: EmployeesPage,
@@ -139,11 +131,8 @@ function EmployeesPage() {
     setProfile((p) => ({ ...p, [key]: value }));
 
   const rows = (employees.data ?? []).filter((e) =>
-    [e.full_name, e.job_title, e.department, e.email].join(" ").includes(term.trim()),
+    [e.full_name, e.job_title, e.department, e.email, e.org_unit].join(" ").includes(term.trim()),
   );
-
-  const branchName = (id: string | null) =>
-    branches.data?.find((b) => b.id === id)?.name ?? "—";
 
   return (
     <div className="space-y-6">
@@ -174,91 +163,85 @@ function EmployeesPage() {
         </div>
       ) : null}
 
-      <div className="panel p-4">
-        <div className="relative mb-4 max-w-sm">
-          <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder="ابحث بالاسم أو المسمى الوظيفي..."
-            className="pr-9"
-          />
+      <div className="panel overflow-hidden">
+        <div className="border-b p-4">
+          <div className="relative max-w-sm">
+            <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              placeholder="ابحث بالاسم أو المهمة..."
+              className="pr-9"
+            />
+          </div>
         </div>
-
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-right">الاسم</TableHead>
-                <TableHead className="text-right">المسمى الوظيفي</TableHead>
-                <TableHead className="text-right">القسم</TableHead>
-                {isLeadership && <TableHead className="text-right">الفرع</TableHead>}
-                {isLeadership && <TableHead className="text-right">الراتب</TableHead>}
-                <TableHead className="text-right">الحالة</TableHead>
-                {isLeadership && <TableHead className="text-right">إجراءات</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="font-semibold">{e.full_name}</TableCell>
-                  <TableCell>{e.job_title}</TableCell>
-                  <TableCell>{e.org_unit || e.department || "—"}</TableCell>
-                  {isLeadership && <TableCell>{branchName(e.branch_id)}</TableCell>}
-                  {isLeadership && <TableCell>{currency(Number(e.salary))} ر.س</TableCell>}
-                  <TableCell>
-                    <Badge variant={e.status === "active" ? "default" : "secondary"}>
-                      {STATUSES[e.status] ?? e.status}
-                    </Badge>
-                  </TableCell>
-                  {isLeadership && (
-                    <TableCell>
-                      <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label="الملف الشخصي والتقييم"
-                        title="الملف الشخصي والتقييم"
-                        onClick={() => openProfile(e)}
-                      >
-                        <ClipboardList className="size-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label="تعديل"
-                        onClick={() => {
-                          setForm(e);
-                          setOpen(true);
-                        }}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
+        <ul className="divide-y">
+          {rows.map((e) => {
+            const unit = e.org_unit || e.department;
+            const role = e.app_role && e.app_role in ROLE_LABEL ? ROLE_LABEL[e.app_role] : null;
+            return (
+              <li key={e.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-extrabold text-primary">
+                  {e.full_name.trim().slice(0, 1)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-extrabold">{e.full_name}</p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {e.job_title || "بدون مسمى"}
+                    {unit && unit !== "عام" ? ` · ${unit}` : ""}
+                  </p>
+                </div>
+                {role ? (
+                  <span className="hidden shrink-0 text-xs font-semibold text-muted-foreground sm:block">
+                    {role}
+                  </span>
+                ) : null}
+                <Badge variant={e.status === "active" ? "default" : "secondary"}>
+                  {STATUSES[e.status] ?? e.status}
+                </Badge>
+                {isLeadership && (
+                  <div className="flex shrink-0 gap-0.5">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="الملف الشخصي والتقييم"
+                      title="الملف الشخصي والتقييم"
+                      onClick={() => openProfile(e)}
+                    >
+                      <ClipboardList className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="تعديل"
+                      onClick={() => {
+                        setForm(e);
+                        setOpen(true);
+                      }}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    {isManager && (
                       <Button
                         size="icon"
                         variant="ghost"
                         aria-label="حذف"
                         onClick={() => {
-                          if (confirm(`حذف الموظف ${e.full_name}؟`)) remove.mutate(e.id);
+                          if (confirm(`حذف ${e.full_name}؟`)) remove.mutate(e.id);
                         }}
                       >
                         <Trash2 className="size-4 text-destructive" />
                       </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-              {!rows.length && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                    لا يوجد موظفون مطابقون.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+          {!rows.length && (
+            <li className="px-4 py-10 text-center text-sm text-muted-foreground">لا يوجد أعضاء مطابقون.</li>
+          )}
+        </ul>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
