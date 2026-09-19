@@ -161,9 +161,9 @@ function AssistantPage() {
           <BrainCircuit className="size-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-extrabold">المساعد الذكي الشخصي</h1>
+          <h1 className="text-2xl font-extrabold">المساعد التحليلي</h1>
           <p className="text-xs text-muted-foreground">
-            نبرة تحليلية استراتيجية هادئة · يحترم استقلاليتك وخصوصيتك · يحوّل الرؤية إلى بنية
+            حالياً قوالب محلية حسب كلمات مفتاحية — ليس نموذجاً ذكياً متصلاً بالإنترنت
           </p>
         </div>
         <Button
