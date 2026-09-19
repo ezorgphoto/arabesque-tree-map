@@ -1,6 +1,4 @@
--- يسمح بتفعيل الحساب فقط إذا كان البريد موجوداً في بطاقة موظف.
--- شغّله مرة من SQL Editor.
-
+-- حسابات الدخول للمسؤول / النائب / مشرف اللجنة فقط.
 create or replace function public.can_activate_account(p_email text)
 returns boolean
 language sql
@@ -13,6 +11,7 @@ as $$
     from public.employees
     where trim(email) <> ''
       and lower(trim(email)) = lower(trim(p_email))
+      and app_role in ('manager', 'deputy', 'supervisor')
   );
 $$;
 

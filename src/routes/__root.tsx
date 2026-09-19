@@ -33,23 +33,23 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { AuthProvider, ROLE_LABEL, useAuth } from "@/lib/auth";
 
 const NAV = [
-  { to: "/", label: "لوحة القيادة", icon: LayoutDashboard, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/tasks", label: "مهامي", icon: KanbanSquare, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/projects", label: "عمل الفريق", icon: FolderKanban, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/planner", label: "المخطط المشترك", icon: CalendarRange, roles: ["manager", "deputy", "supervisor", "member"] },
-  { to: "/employees", label: "الزملاء", icon: Users, roles: ["manager", "deputy", "supervisor", "member"] },
+  { to: "/", label: "لوحة القيادة", icon: LayoutDashboard, roles: ["manager", "deputy", "supervisor"] },
+  { to: "/tasks", label: "مهامي", icon: KanbanSquare, roles: ["manager", "deputy", "supervisor"] },
+  { to: "/projects", label: "عمل الفريق", icon: FolderKanban, roles: ["manager", "deputy", "supervisor"] },
+  { to: "/planner", label: "المخطط المشترك", icon: CalendarRange, roles: ["manager", "deputy", "supervisor"] },
+  { to: "/reports", label: "مركز التقارير", icon: FileBarChart2, roles: ["manager", "deputy", "supervisor"] },
+  { to: "/notes", label: "الملاحظات", icon: NotebookPen, roles: ["manager", "deputy", "supervisor"] },
+  { to: "/employees", label: "الزملاء", icon: Users, roles: ["manager", "deputy"] },
   { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network, roles: ["manager", "deputy"] },
-  { to: "/reports", label: "مركز التقارير", icon: FileBarChart2, roles: ["manager", "deputy"] },
   { to: "/permissions", label: "الصلاحيات", icon: Shield, roles: ["manager"] },
   { to: "/map", label: "خريطة الفروع", icon: MapPin, roles: ["manager", "deputy"] },
-  { to: "/notes", label: "الملاحظات", icon: NotebookPen, roles: ["manager", "deputy"] },
   { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit, roles: ["manager", "deputy"] },
 ] as const;
 
 const NAV_GROUPS = [
   { title: "يومي", paths: ["/", "/tasks", "/projects", "/planner"] },
-  { title: "الناس", paths: ["/employees", "/hierarchy"] },
-  { title: "إدارة", paths: ["/reports", "/permissions", "/map", "/notes", "/assistant"] },
+  { title: "عملي", paths: ["/reports", "/notes"] },
+  { title: "إدارة", paths: ["/employees", "/hierarchy", "/permissions", "/map", "/assistant"] },
 ] as const;
 
 function NotFoundComponent() {
@@ -269,13 +269,27 @@ function UnlinkedAccount() {
   );
 }
 
+function MemberNoAccount() {
+  const { signOut } = useAuth();
+  return (
+    <div className="mx-auto max-w-md space-y-3 p-8 text-center">
+      <h1 className="text-xl font-extrabold">العضو لا يملك حساب دخول</h1>
+      <p className="text-sm text-muted-foreground">
+        الحسابات للمسؤول والنائب ومشرف اللجنة فقط. الأعضاء يُدارون من البطاقات ويُسند إليهم العمل دون دخول.
+      </p>
+      <button type="button" className="text-sm font-semibold text-primary" onClick={() => void signOut()}>
+        خروج
+      </button>
+    </div>
+  );
+}
+
 function AuthGate() {
-  const { loading, session, profile } = useAuth();
+  const { loading, session, profile, role } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isLogin = pathname === "/login";
 
-  if (profile) return <Shell />;
-  if (loading) {
+  if (loading && !profile) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         جارٍ التحقق من الجلسة…
@@ -286,6 +300,8 @@ function AuthGate() {
   if (session && isLogin) return <Navigate to="/" />;
   if (!session && isLogin) return <Outlet />;
   if (session && !profile) return <UnlinkedAccount />;
+  if (role === "member") return <MemberNoAccount />;
+  if (profile) return <Shell />;
   return <Shell />;
 }
 

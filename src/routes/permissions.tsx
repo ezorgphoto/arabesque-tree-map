@@ -55,7 +55,7 @@ function PermissionsPage() {
           <Shield className="size-7 text-primary" /> الصلاحيات والحسابات
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          عيّن الدور والقسم والبريد لكل شخص. هو يدخل من صفحة الدخول بنفس البريد، وفي أول مرة يختار كلمة مروره.
+          عيّن الدور والقسم والبريد. الدخول للمسؤول والنائب ومشرف اللجنة فقط — العضو بطاقة عمل بلا حساب.
         </p>
       </header>
       <div className="panel overflow-x-auto p-4">

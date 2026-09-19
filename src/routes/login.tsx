@@ -45,7 +45,9 @@ function LoginPage() {
         const allowed = await supabase.rpc("can_activate_account" as never, { p_email: mail } as never);
         if (allowed.error) throw new Error(allowed.error.message);
         if (!allowed.data) {
-          toast.error("هذا البريد غير مسجّل في المنظومة. اطلب من المسؤول حفظه في بطاقتك أولاً");
+          toast.error(
+            "هذا البريد غير مسموح له بحساب. الدخول للمسؤول والنائب ومشرف اللجنة فقط، بعد تسجيل البريد في البطاقة.",
+          );
           return;
         }
         const { error: upError } = await supabase.auth.signUp({ email: mail, password });
@@ -73,8 +75,8 @@ function LoginPage() {
             <h1 className="text-xl font-extrabold">نظام الإدارة التنفيذية</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {mode === "in"
-                ? "دخول حقيقي بالبريد وكلمة المرور"
-                : "أول مرة فقط: فعّل حسابك بنفس البريد المسجّل لك"}
+                ? "دخول للمسؤول / النائب / مشرف اللجنة"
+                : "أول مرة: فعّل حسابك بنفس البريد المسجّل (ليس للعضو)"}
             </p>
           </div>
         </div>

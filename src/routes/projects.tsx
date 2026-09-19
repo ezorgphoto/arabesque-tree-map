@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { FolderKanban, Plus } from "lucide-react";
 
 import { api, PROJECT_STATUSES, type Project } from "@/lib/api";
+import { projectDepsApi } from "@/lib/project-deps";
 import { useAuth } from "@/lib/auth";
+import { ProjectGantt } from "@/components/ProjectGantt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,16 +40,24 @@ const empty: Partial<Project> = {
   parent_id: null,
   predecessor_id: null,
   manager_id: null,
+  start_date: null,
+  end_date: null,
 };
 
 function ProjectsPage() {
-  const { profile } = useAuth();
+  const { profile, isLeadership, isSupervisor } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<Project>>(empty);
+  const [tab, setTab] = useState<"list" | "gantt">("list");
   const list = useQuery({ queryKey: ["projects"], queryFn: api.projects.list });
-  const people = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
-  const roots = (list.data ?? []).filter((p) => !p.parent_id);
+  const deps = useQuery({ queryKey: ["project_deps"], queryFn: projectDepsApi.list });
+  const people = useQuery({
+    queryKey: ["employees"],
+    queryFn: api.employees.list,
+    enabled: isLeadership || isSupervisor,
+  });
+  const roots = useMemo(() => (list.data ?? []).filter((p) => !p.parent_id), [list.data]);
   const personName = (id: string | null) =>
     people.data?.find((e) => e.id === id)?.full_name ?? "غير مسند";
 
@@ -61,7 +71,7 @@ function ProjectsPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["projects"] });
       setOpen(false);
-      toast.success("ظهر المشروع للقسم وللمسند إليه وللمسؤول");
+      toast.success("ظهر المشروع للقسم وللمسند إليه");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -74,47 +84,77 @@ function ProjectsPage() {
             <FolderKanban className="size-7 text-primary" /> عمل الفريق
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            هنا العمل المشترك. مشروع القسم يراه زملاء القسم والمسؤول. إذا أسندته لشخص يظهر في قائمته.
+            مشاريع القسم والمسندة إليك، مع مخطط غانت والاعتمادات.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setForm({
-              ...empty,
-              org_unit: profile?.org_unit || profile?.department || "",
-              manager_id: profile?.id ?? null,
-            });
-            setOpen(true);
-          }}
-        >
-          <Plus className="size-4" /> مشروع جديد
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <div className="flex rounded-lg border p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              className={`rounded-md px-3 py-1.5 ${tab === "list" ? "bg-primary text-primary-foreground" : ""}`}
+              onClick={() => setTab("list")}
+            >
+              قائمة
+            </button>
+            <button
+              type="button"
+              className={`rounded-md px-3 py-1.5 ${tab === "gantt" ? "bg-primary text-primary-foreground" : ""}`}
+              onClick={() => setTab("gantt")}
+            >
+              غانت
+            </button>
+          </div>
+          <Button
+            onClick={() => {
+              setForm({
+                ...empty,
+                org_unit: profile?.org_unit || profile?.department || "",
+                manager_id: profile?.id ?? null,
+              });
+              setOpen(true);
+            }}
+          >
+            <Plus className="size-4" /> مشروع جديد
+          </Button>
+        </div>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {roots.map((p) => (
-          <Link
-            key={p.id}
-            to="/projects/$id"
-            params={{ id: p.id }}
-            className="panel block p-5 transition-colors hover:bg-muted/60"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <h2 className="text-lg font-extrabold">{p.title}</h2>
-              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                {PROJECT_STATUSES[p.status] ?? p.status}
-              </span>
-            </div>
-            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{p.description || "بدون وصف"}</p>
-            <p className="mt-3 text-xs text-muted-foreground">
-              {p.org_unit || "عام"} · مسند إلى {personName(p.manager_id)}
-            </p>
-          </Link>
-        ))}
-        {!roots.length && (
-          <p className="text-sm text-muted-foreground">لا يوجد عمل مشترك بعد. أنشئ أول مشروع لقسمك.</p>
-        )}
-      </div>
+      {tab === "gantt" ? (
+        <div className="panel p-5">
+          <h2 className="mb-4 text-lg font-extrabold">مخطط غانت</h2>
+          <ProjectGantt projects={list.data ?? []} deps={deps.data ?? []} />
+        </div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {roots.map((p) => (
+            <Link
+              key={p.id}
+              to="/projects/$id"
+              params={{ id: p.id }}
+              className="panel block p-5 transition-colors hover:bg-muted/60"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-lg font-extrabold">{p.title}</h2>
+                <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                  {PROJECT_STATUSES[p.status] ?? p.status}
+                </span>
+              </div>
+              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                {p.description || "بدون وصف"}
+              </p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {p.org_unit || "عام"} · مسند إلى {personName(p.manager_id)}
+                {p.start_date || p.end_date
+                  ? ` · ${p.start_date || "؟"} → ${p.end_date || "؟"}`
+                  : ""}
+              </p>
+            </Link>
+          ))}
+          {!roots.length && (
+            <p className="text-sm text-muted-foreground">لا يوجد عمل مشترك بعد. أنشئ أول مشروع.</p>
+          )}
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent dir="rtl">
@@ -139,6 +179,24 @@ function ProjectsPage() {
                 value={form.org_unit ?? ""}
                 onChange={(e) => setForm({ ...form, org_unit: e.target.value })}
               />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>البداية</Label>
+                <Input
+                  type="date"
+                  value={form.start_date ?? ""}
+                  onChange={(e) => setForm({ ...form, start_date: e.target.value || null })}
+                />
+              </div>
+              <div>
+                <Label>النهاية</Label>
+                <Input
+                  type="date"
+                  value={form.end_date ?? ""}
+                  onChange={(e) => setForm({ ...form, end_date: e.target.value || null })}
+                />
+              </div>
             </div>
             <div>
               <Label>يسنده إلى</Label>

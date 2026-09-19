@@ -5,7 +5,9 @@ import { toast } from "sonner";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 
 import { api, PROJECT_STATUSES, type Project } from "@/lib/api";
+import { DEP_TYPE_LABEL, projectDepsApi, type DepType } from "@/lib/project-deps";
 import { useAuth } from "@/lib/auth";
+import { ProjectGantt } from "@/components/ProjectGantt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,10 +31,15 @@ function ProjectDetailPage() {
   const people = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
   const qc = useQueryClient();
   const [childTitle, setChildTitle] = useState("");
+  const [depOn, setDepOn] = useState("none");
+  const [depType, setDepType] = useState<DepType>("FS");
+  const [lagDays, setLagDays] = useState(0);
   const list = useQuery({ queryKey: ["projects"], queryFn: api.projects.list });
+  const depsQ = useQuery({ queryKey: ["project_deps"], queryFn: projectDepsApi.list });
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks.list });
   const all = list.data ?? [];
   const project = all.find((p) => p.id === id);
+  const myDeps = (depsQ.data ?? []).filter((d) => d.project_id === id);
   const canEdit =
     isLeadership ||
     isSupervisor ||
@@ -43,8 +50,15 @@ function ProjectDetailPage() {
     [all, id],
   );
   const linkedTasks = (tasks.data ?? []).filter((t) => t.project_id === id);
+  const family = useMemo(
+    () => [project, ...children].filter(Boolean) as Project[],
+    [project, children],
+  );
 
-  const invalidate = () => void qc.invalidateQueries({ queryKey: ["projects"] });
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ["projects"] });
+    void qc.invalidateQueries({ queryKey: ["project_deps"] });
+  };
 
   const save = useMutation({
     mutationFn: (row: Partial<Project>) => api.projects.update(id, row),
@@ -167,28 +181,6 @@ function ProjectDetailPage() {
           </Select>
         </div>
         <div>
-          <Label>يعتمد على (مشروع سابق)</Label>
-          <Select
-            defaultValue={project.predecessor_id ?? "none"}
-            onValueChange={(v) => canEdit && save.mutate({ predecessor_id: v === "none" ? null : v })}
-            disabled={!canEdit}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="بدون سابق" />
-            </SelectTrigger>
-            <SelectContent dir="rtl">
-              <SelectItem value="none">بدون سابق</SelectItem>
-              {all
-                .filter((p) => p.id !== id)
-                .map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.title}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
           <Label>البداية</Label>
           <Input
             type="date"
@@ -206,6 +198,100 @@ function ProjectDetailPage() {
             onBlur={(e) => canEdit && save.mutate({ end_date: e.target.value || null })}
           />
         </div>
+      </div>
+
+      <section className="panel space-y-3 p-5">
+        <h2 className="text-lg font-extrabold">اعتمادات معقّدة</h2>
+        <p className="text-xs text-muted-foreground">
+          FS انتهاء←بدء · SS بدء←بدء · FF انتهاء←انتهاء · SF بدء←انتهاء · مع تأخير بالأيام
+        </p>
+        <ul className="space-y-2 text-sm">
+          {myDeps.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-2 border-b pb-2">
+              <span>
+                {DEP_TYPE_LABEL[d.dep_type]} ← {all.find((p) => p.id === d.depends_on_id)?.title ?? "؟"}
+                {d.lag_days ? ` (+${d.lag_days} يوم)` : ""}
+              </span>
+              {canEdit && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive"
+                  onClick={async () => {
+                    await projectDepsApi.remove(d.id);
+                    invalidate();
+                  }}
+                >
+                  حذف
+                </Button>
+              )}
+            </li>
+          ))}
+          {!myDeps.length && <p className="text-muted-foreground">لا اعتمادات بعد.</p>}
+        </ul>
+        {canEdit && (
+          <div className="grid gap-2 sm:grid-cols-4">
+            <Select value={depOn} onValueChange={setDepOn}>
+              <SelectTrigger>
+                <SelectValue placeholder="يعتمد على" />
+              </SelectTrigger>
+              <SelectContent dir="rtl">
+                <SelectItem value="none">اختر مشروعاً</SelectItem>
+                {all
+                  .filter((p) => p.id !== id)
+                  .map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.title}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Select value={depType} onValueChange={(v) => setDepType(v as DepType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent dir="rtl">
+                {(Object.keys(DEP_TYPE_LABEL) as DepType[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {DEP_TYPE_LABEL[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              value={lagDays}
+              onChange={(e) => setLagDays(Number(e.target.value) || 0)}
+              placeholder="تأخير أيام"
+            />
+            <Button
+              disabled={depOn === "none"}
+              onClick={async () => {
+                try {
+                  await projectDepsApi.create({
+                    project_id: id,
+                    depends_on_id: depOn,
+                    dep_type: depType,
+                    lag_days: lagDays,
+                  });
+                  if (depType === "FS") await api.projects.update(id, { predecessor_id: depOn });
+                  setDepOn("none");
+                  invalidate();
+                  toast.success("أُضيف الاعتماد");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "تعذّر الحفظ");
+                }
+              }}
+            >
+              إضافة اعتماد
+            </Button>
+          </div>
+        )}
+      </section>
+
+      <div className="panel p-5">
+        <h2 className="mb-3 text-lg font-extrabold">غانت لهذا المشروع ومراحله</h2>
+        <ProjectGantt projects={family} deps={depsQ.data ?? []} />
       </div>
 
       <section className="space-y-3">

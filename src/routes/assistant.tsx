@@ -8,9 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ASSISTANT_INTRO,
   ASSISTANT_SUGGESTIONS,
-  generateAssistantReply,
   type ChatMessage,
 } from "@/lib/assistant";
+import { askAssistant } from "@/lib/assistant-api";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/assistant")({
@@ -135,21 +135,30 @@ function AssistantPage() {
     inputRef.current?.focus();
   };
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const value = text.trim();
     if (!value || thinking) return;
-    setMessages((m) => [...m, { id: uid(), role: "user", content: value, at: Date.now() }]);
+    const userMsg: ChatMessage = { id: uid(), role: "user", content: value, at: Date.now() };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
     setInput("");
     setThinking(true);
-    const delay = 550 + Math.min(value.length * 8, 900);
-    setTimeout(() => {
+    try {
+      const history = nextMessages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .slice(-16)
+        .map((m) => ({ role: m.role, content: m.content }));
+      const res = await askAssistant({ data: { messages: history } });
       setMessages((m) => [
         ...m,
-        { id: uid(), role: "assistant", content: generateAssistantReply(value), at: Date.now() },
+        { id: uid(), role: "assistant", content: res.content, at: Date.now() },
       ]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذّر الاتصال بالمساعد");
+    } finally {
       setThinking(false);
       inputRef.current?.focus();
-    }, delay);
+    }
   };
 
   if (!isLeadership) return <Navigate to="/" />;
@@ -161,9 +170,9 @@ function AssistantPage() {
           <BrainCircuit className="size-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-extrabold">المساعد التحليلي</h1>
+          <h1 className="text-2xl font-extrabold">المساعد الذكي</h1>
           <p className="text-xs text-muted-foreground">
-            حالياً قوالب محلية حسب كلمات مفتاحية — ليس نموذجاً ذكياً متصلاً بالإنترنت
+            متصل بنموذج حقيقي عبر السيرفر · للمسؤول والنائب
           </p>
         </div>
         <Button
