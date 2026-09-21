@@ -3,27 +3,43 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   BookOpen,
+  Bot,
   Compass,
   Map as MapIcon,
   Radio,
   Save,
+  Send,
   Trash2,
+  Tv,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
+import { askAssistant } from "@/lib/assistant-api";
+import { ART_OF_WAR_CHAPTERS } from "@/lib/art-of-war";
 import {
   ART_OF_WAR,
   emptyCommandRoom,
+  flashTickerText,
   loadCommandRoom,
+  NEWS_KIND_LABEL,
   saveCommandRoom,
   uid,
   type CommandRoomState,
+  type NewsFlash,
+  type NewsKind,
   type TopoMark,
 } from "@/lib/command-room";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const TopoMap = lazy(() => import("@/components/TopoMap"));
 
@@ -34,13 +50,15 @@ export const Route = createFileRoute("/command")({
       { title: "غرفة التخطيط | نظام الإدارة التنفيذية" },
       {
         name: "description",
-        content: "قسم خاص بمسؤول الأسرة: خرائط طبوغرافية، فن الحرب، وبيئة التخطيط.",
+        content: "قسم خاص بمسؤول الأسرة: خرائط طبوغرافية، فن الحرب، نشرة الأخبار، ومساعد فن الحرب.",
       },
     ],
   }),
 });
 
-type Tab = "brief" | "topo" | "war" | "env";
+type Tab = "brief" | "news" | "topo" | "war" | "warAi" | "env";
+
+type ChatMsg = { id: string; role: "user" | "assistant"; content: string };
 
 function CommandRoomPage() {
   const { isManager } = useAuth();
@@ -55,6 +73,22 @@ function CommandRoomPage() {
   });
   const [selected, setSelected] = useState<TopoMark | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [flashForm, setFlashForm] = useState<{
+    kind: NewsKind;
+    title: string;
+    detail: string;
+    qty: number;
+  }>({ kind: "troops", title: "", detail: "", qty: 0 });
+  const [warChat, setWarChat] = useState<ChatMsg[]>([
+    {
+      id: "intro",
+      role: "assistant",
+      content:
+        "أنا مساعد فن الحرب. اسأل عن تقييم موقف، نصيحة، أو خطة عمل وسأجيب وفق فصول سون تزو الـ١٣.",
+    },
+  ]);
+  const [warInput, setWarInput] = useState("");
+  const [warThinking, setWarThinking] = useState(false);
 
   useEffect(() => {
     setState(loadCommandRoom());
@@ -93,6 +127,46 @@ function CommandRoomPage() {
     toast.success("أُضيفت نقطة على الخريطة الطبوغرافية");
   };
 
+  const addFlash = () => {
+    if (!flashForm.title.trim()) {
+      toast.error("أدخل عنوان التحديث");
+      return;
+    }
+    const flash: NewsFlash = {
+      id: uid(),
+      kind: flashForm.kind,
+      title: flashForm.title.trim(),
+      detail: flashForm.detail.trim(),
+      qty: Number(flashForm.qty) || 0,
+      at: Date.now(),
+    };
+    patch({ flashes: [flash, ...state.flashes].slice(0, 80) });
+    setFlashForm({ kind: flashForm.kind, title: "", detail: "", qty: 0 });
+    toast.success("نُشر التحديث على شريط الأخبار");
+  };
+
+  const askWar = async () => {
+    const value = warInput.trim();
+    if (!value || warThinking) return;
+    const userMsg: ChatMsg = { id: uid(), role: "user", content: value };
+    const next = [...warChat, userMsg];
+    setWarChat(next);
+    setWarInput("");
+    setWarThinking(true);
+    try {
+      const history = next
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .slice(-14)
+        .map((m) => ({ role: m.role, content: m.content }));
+      const res = await askAssistant({ data: { messages: history, mode: "art-of-war" } });
+      setWarChat((m) => [...m, { id: uid(), role: "assistant", content: res.content }]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذّر الاتصال بمساعد فن الحرب");
+    } finally {
+      setWarThinking(false);
+    }
+  };
+
   const clock = now.toLocaleString("ar-SY", {
     weekday: "long",
     hour: "2-digit",
@@ -101,10 +175,14 @@ function CommandRoomPage() {
 
   const tabs: { key: Tab; label: string; icon: typeof Radio }[] = [
     { key: "brief", label: "نشرة ميدانية", icon: Radio },
+    { key: "news", label: "غرفة الأخبار", icon: Tv },
     { key: "topo", label: "خرائط طبوغرافية", icon: MapIcon },
-    { key: "war", label: "فن الحرب", icon: BookOpen },
+    { key: "war", label: "فصول فن الحرب", icon: BookOpen },
+    { key: "warAi", label: "مساعد فن الحرب", icon: Bot },
     { key: "env", label: "بيئة التخطيط", icon: Compass },
   ];
+
+  const ticker = flashTickerText(state.flashes);
 
   return (
     <div className="space-y-4">
@@ -124,10 +202,7 @@ function CommandRoomPage() {
           <p className="mt-2 max-w-3xl text-sm text-white/75">{state.lead}</p>
         </div>
         <div className="overflow-hidden border-t border-white/10 bg-black/40 py-2">
-          <p className="animate-[marquee_28s_linear_infinite] whitespace-nowrap text-xs text-amber-200/90">
-            عاجل · التخطيط قبل الحركة · راجع الأرض قبل القرار · وحدة الأمر مسار واحد · الإمداد قبل الإطلاق · معرفة النفس والآخر ·&nbsp;
-            عاجل · التخطيط قبل الحركة · راجع الأرض قبل القرار · وحدة الأمر مسار واحد · الإمداد قبل الإطلاق · معرفة النفس والآخر
-          </p>
+          <p className="cmd-marquee whitespace-nowrap text-xs text-amber-200/90">{ticker}{ticker}</p>
         </div>
       </header>
 
@@ -185,10 +260,105 @@ function CommandRoomPage() {
         </div>
       )}
 
+      {tab === "news" && (
+        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="panel space-y-3 p-5">
+            <h2 className="font-extrabold">إضافة تحديث (مثل قنوات الأخبار)</h2>
+            <p className="text-xs text-muted-foreground">
+              سجّل دخول جنود أو آليات أو عتاد أو تحرك — يظهر فوراً على شريط العاجل أعلاه.
+            </p>
+            <div>
+              <Label>النوع</Label>
+              <Select
+                value={flashForm.kind}
+                onValueChange={(v) => setFlashForm((f) => ({ ...f, kind: v as NewsKind }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent dir="rtl">
+                  {(Object.keys(NEWS_KIND_LABEL) as NewsKind[]).map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {NEWS_KIND_LABEL[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>العنوان العاجل</Label>
+              <Input
+                value={flashForm.title}
+                onChange={(e) => setFlashForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="مثال: وصول دفعة آليات خفيفة"
+              />
+            </div>
+            <div>
+              <Label>العدد (اختياري)</Label>
+              <Input
+                type="number"
+                value={String(flashForm.qty)}
+                onChange={(e) => setFlashForm((f) => ({ ...f, qty: Number(e.target.value) || 0 }))}
+              />
+            </div>
+            <div>
+              <Label>التفاصيل</Label>
+              <Textarea
+                rows={4}
+                value={flashForm.detail}
+                onChange={(e) => setFlashForm((f) => ({ ...f, detail: e.target.value }))}
+                placeholder="المصدر، الاتجاه، الملاحظات…"
+              />
+            </div>
+            <Button className="w-full" onClick={addFlash}>
+              بث التحديث
+            </Button>
+          </div>
+          <div className="panel space-y-3 p-5">
+            <h2 className="font-extrabold">سجل البث</h2>
+            <ul className="max-h-[28rem] space-y-3 overflow-y-auto">
+              {state.flashes.map((f) => (
+                <li key={f.id} className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold text-red-600">
+                        عاجل · {NEWS_KIND_LABEL[f.kind]}
+                        {f.qty ? ` · ${f.qty}` : ""}
+                      </p>
+                      <p className="font-extrabold">{f.title}</p>
+                      {f.detail ? <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p> : null}
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {new Date(f.at).toLocaleString("ar-SY")}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="حذف"
+                      onClick={() => patch({ flashes: state.flashes.filter((x) => x.id !== f.id) })}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+              {!state.flashes.length && (
+                <p className="text-sm text-muted-foreground">لا تحديثات بعد. أضف أول بث من اليسار.</p>
+              )}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {tab === "topo" && (
         <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
           <div className="panel h-[420px] overflow-hidden p-0 md:h-[520px]">
-            <ClientOnly fallback={<div className="flex h-full items-center justify-center text-sm text-muted-foreground">تحميل الخريطة…</div>}>
+            <ClientOnly
+              fallback={
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  تحميل الخريطة…
+                </div>
+              }
+            >
               <Suspense fallback={<div className="flex h-full items-center justify-center text-sm">…</div>}>
                 <TopoMap
                   marks={state.marks}
@@ -269,22 +439,90 @@ function CommandRoomPage() {
       )}
 
       {tab === "war" && (
-        <div className="grid gap-3 md:grid-cols-2">
-          {ART_OF_WAR.map((card) => (
-            <div key={card.id} className="panel space-y-2 p-5">
-              <h2 className="text-base font-extrabold">{card.title}</h2>
-              <p className="text-sm text-muted-foreground">{card.text}</p>
-              <Label>ملاحظتك الخاصة</Label>
-              <Textarea
-                rows={3}
-                value={state.warNotes[card.id] ?? ""}
-                onChange={(e) =>
-                  patch({ warNotes: { ...state.warNotes, [card.id]: e.target.value } })
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            الفصول الـ١٣ كاملة مع المبادئ والتطبيق. اكتب ملاحظاتك تحت كل فصل لتغذية تقييماتك لاحقاً.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            {ART_OF_WAR_CHAPTERS.map((card) => (
+              <div key={card.id} className="panel space-y-2 p-5">
+                <p className="text-[11px] font-bold text-primary">الفصل {card.chapter}</p>
+                <h2 className="text-base font-extrabold">{card.title}</h2>
+                <p className="text-sm text-muted-foreground">{card.summary}</p>
+                <ul className="space-y-1 text-xs">
+                  {card.maxims.map((m) => (
+                    <li key={m} className="flex gap-2">
+                      <span className="mt-1.5 size-1 shrink-0 rounded-full bg-primary/70" />
+                      <span>{m}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] font-bold text-muted-foreground">تطبيق عملي</p>
+                <ul className="space-y-1 text-xs text-muted-foreground">
+                  {card.apply.map((a) => (
+                    <li key={a}>• {a}</li>
+                  ))}
+                </ul>
+                <Label>ملاحظتك الخاصة</Label>
+                <Textarea
+                  rows={3}
+                  value={state.warNotes[card.id] ?? ""}
+                  onChange={(e) =>
+                    patch({ warNotes: { ...state.warNotes, [card.id]: e.target.value } })
+                  }
+                  placeholder="كيف يطبَّق هذا الفصل على وضعك الحالي؟"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="panel p-4 text-xs text-muted-foreground">
+            بطاقات مختصرة للمرجع السريع: {ART_OF_WAR.map((c) => c.title).join(" · ")}
+          </div>
+        </div>
+      )}
+
+      {tab === "warAi" && (
+        <div className="panel flex h-[min(70vh,640px)] flex-col p-0">
+          <div className="border-b px-4 py-3">
+            <h2 className="font-extrabold">مساعد فن الحرب</h2>
+            <p className="text-xs text-muted-foreground">
+              يرد وفق فصول سون تزو فقط — للتقييم والنصيحة وخطة العمل.
+            </p>
+          </div>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+            {warChat.map((m) => (
+              <div
+                key={m.id}
+                className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm ${
+                  m.role === "user"
+                    ? "ms-auto bg-primary text-primary-foreground"
+                    : "border bg-background"
+                }`}
+              >
+                <p className="whitespace-pre-wrap">{m.content}</p>
+              </div>
+            ))}
+            {warThinking && (
+              <p className="text-sm text-muted-foreground">يراجع الفصول ويصوغ الرد…</p>
+            )}
+          </div>
+          <div className="flex gap-2 border-t p-3">
+            <Textarea
+              rows={2}
+              value={warInput}
+              onChange={(e) => setWarInput(e.target.value)}
+              placeholder="مثال: قيّم موقفي إن تأخر الإمداد أسبوعاً…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void askWar();
                 }
-                placeholder="كيف يطبَّق هذا المبدأ على وضعك الحالي؟"
-              />
-            </div>
-          ))}
+              }}
+            />
+            <Button disabled={warThinking || !warInput.trim()} onClick={() => void askWar()}>
+              <Send className="size-4" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -303,8 +541,13 @@ function CommandRoomPage() {
       )}
 
       <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(-20%); }
+        .cmd-marquee {
+          display: inline-block;
+          min-width: 100%;
+          animation: cmd-marquee 36s linear infinite;
+        }
+        @keyframes cmd-marquee {
+          0% { transform: translateX(-30%); }
           100% { transform: translateX(100%); }
         }
       `}</style>

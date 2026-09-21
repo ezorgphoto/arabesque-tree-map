@@ -1,9 +1,26 @@
+import { ART_OF_WAR } from "@/lib/art-of-war";
+
+export { ART_OF_WAR };
+export type { WarChapter } from "@/lib/art-of-war";
+export { ART_OF_WAR_CHAPTERS } from "@/lib/art-of-war";
+
 export type TopoMark = {
   id: string;
   title: string;
   note: string;
   lat: number;
   lng: number;
+};
+
+export type NewsKind = "troops" | "vehicles" | "gear" | "movement" | "other";
+
+export type NewsFlash = {
+  id: string;
+  kind: NewsKind;
+  title: string;
+  detail: string;
+  qty: number;
+  at: number;
 };
 
 export type CommandRoomState = {
@@ -14,41 +31,17 @@ export type CommandRoomState = {
   environment: string;
   marks: TopoMark[];
   warNotes: Record<string, string>;
+  flashes: NewsFlash[];
   updatedAt: number;
 };
 
-export const ART_OF_WAR = [
-  {
-    id: "know",
-    title: "معرفة النفس والآخر",
-    text: "من عرف نفسه وعرف خصمه قلّ أن يُهزَم. التخطيط يبدأ بتقييم صادق للقوة والضعف قبل أي حركة.",
-  },
-  {
-    id: "terrain",
-    title: "الأرض والموقع",
-    text: "الموقع يغيّر الحسابات. قبل القرار: ما طبيعة الأرض؟ أين الممرات؟ أين المخارج؟ أين التجمع الآمن؟",
-  },
-  {
-    id: "timing",
-    title: "التوقيت",
-    text: "النصر ليس سرعة عشوائية. انتظر اللحظة التي يقلّ فيها الغموض وتظهر فيها فرصة قابلة للاستغلال.",
-  },
-  {
-    id: "deception",
-    title: "الإظهار والإخفاء",
-    text: "أظهر ما يُراد أن يُرى، واحفظ ما يجب ألا يُكشف. في العمل التنظيمي: لا تنشر كل الخطة لكل المستويات.",
-  },
-  {
-    id: "unity",
-    title: "وحدة الأمر",
-    text: "تعدد الأوامر يشتت الجهد. لكل مسار مسؤول واحد ونتيجة واحدة قابلة للقياس.",
-  },
-  {
-    id: "logistics",
-    title: "الإمداد والاستمرارية",
-    text: "الحملة بلا إمداد تنهار. راجع الموارد، التواصل، والبدائل قبل الإطلاق لا بعده.",
-  },
-] as const;
+export const NEWS_KIND_LABEL: Record<NewsKind, string> = {
+  troops: "جنود / أفراد",
+  vehicles: "آليات",
+  gear: "عتاد",
+  movement: "تحرك",
+  other: "أخرى",
+};
 
 export const ENV_PROMPTS = [
   "ما حالة الميدان اليوم؟ (هادئ / متوتر / فرصة)",
@@ -58,7 +51,7 @@ export const ENV_PROMPTS = [
   "ما المعلومة الناقصة قبل أي خطوة كبيرة؟",
 ] as const;
 
-const KEY = "exec_command_room_v1";
+const KEY = "exec_command_room_v2";
 
 export function emptyCommandRoom(): CommandRoomState {
   return {
@@ -69,6 +62,7 @@ export function emptyCommandRoom(): CommandRoomState {
     environment: ENV_PROMPTS.map((q) => `• ${q}\n`).join("\n"),
     marks: [],
     warNotes: {},
+    flashes: [],
     updatedAt: Date.now(),
   };
 }
@@ -76,9 +70,9 @@ export function emptyCommandRoom(): CommandRoomState {
 export function loadCommandRoom(): CommandRoomState {
   if (typeof window === "undefined") return emptyCommandRoom();
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) ?? localStorage.getItem("exec_command_room_v1");
     if (!raw) return emptyCommandRoom();
-    return { ...emptyCommandRoom(), ...(JSON.parse(raw) as CommandRoomState) };
+    return { ...emptyCommandRoom(), ...(JSON.parse(raw) as Partial<CommandRoomState>) };
   } catch {
     return emptyCommandRoom();
   }
@@ -91,4 +85,19 @@ export function saveCommandRoom(state: CommandRoomState) {
 
 export function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+export function flashTickerText(flashes: NewsFlash[]) {
+  if (!flashes.length) {
+    return "عاجل · لا تحديثات آليات/جنود بعد · أضف من تبويب غرفة الأخبار · التخطيط قبل الحركة ·";
+  }
+  return flashes
+    .slice(0, 12)
+    .map((f) => {
+      const label = NEWS_KIND_LABEL[f.kind];
+      const q = f.qty > 0 ? ` ×${f.qty}` : "";
+      return `عاجل · ${label}${q}: ${f.title}`;
+    })
+    .join(" · ")
+    .concat(" · ");
 }
