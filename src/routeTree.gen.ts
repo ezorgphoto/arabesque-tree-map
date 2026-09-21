@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssistantRouteImport } from './routes/assistant'
+import { Route as CommandRouteImport } from './routes/command'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as HierarchyRouteImport } from './routes/hierarchy'
 import { Route as LoginRouteImport } from './routes/login'
@@ -33,6 +34,11 @@ const IndexRoute = IndexRouteImport.update({
 const AssistantRoute = AssistantRouteImport.update({
   id: '/assistant',
   path: '/assistant',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommandRoute = CommandRouteImport.update({
+  id: '/command',
+  path: '/command',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmployeesRoute = EmployeesRouteImport.update({
@@ -104,6 +110,7 @@ const ReportsNewRoute = ReportsNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/command': typeof CommandRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/login': typeof LoginRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/command': typeof CommandRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/login': typeof LoginRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/command': typeof CommandRoute
   '/employees': typeof EmployeesRoute
   '/hierarchy': typeof HierarchyRoute
   '/login': typeof LoginRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/assistant'
+    | '/command'
     | '/employees'
     | '/hierarchy'
     | '/login'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/assistant'
+    | '/command'
     | '/employees'
     | '/hierarchy'
     | '/login'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/assistant'
+    | '/command'
     | '/employees'
     | '/hierarchy'
     | '/login'
@@ -208,6 +220,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AssistantRoute: typeof AssistantRoute
+  CommandRoute: typeof CommandRoute
   EmployeesRoute: typeof EmployeesRoute
   HierarchyRoute: typeof HierarchyRoute
   LoginRoute: typeof LoginRoute
@@ -235,6 +248,13 @@ declare module '@tanstack/react-router' {
       path: '/assistant'
       fullPath: '/assistant'
       preLoaderRoute: typeof AssistantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/command': {
+      id: '/command'
+      path: '/command'
+      fullPath: '/command'
+      preLoaderRoute: typeof CommandRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/employees': {
@@ -347,6 +367,7 @@ const ReportsRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssistantRoute: AssistantRoute,
+  CommandRoute: CommandRoute,
   EmployeesRoute: EmployeesRoute,
   HierarchyRoute: HierarchyRoute,
   LoginRoute: LoginRoute,

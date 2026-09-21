@@ -24,6 +24,7 @@ import {
   LogOut,
   Shield,
   FolderKanban,
+  Radio,
 } from "lucide-react";
 
 import appCss from "../styles.css?url";
@@ -42,6 +43,7 @@ const NAV = [
   { to: "/employees", label: "الزملاء", icon: Users, roles: ["manager", "deputy"] },
   { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network, roles: ["manager", "deputy"] },
   { to: "/permissions", label: "الصلاحيات", icon: Shield, roles: ["manager"] },
+  { to: "/command", label: "غرفة التخطيط", icon: Radio, roles: ["manager"] },
   { to: "/map", label: "خريطة الفروع", icon: MapPin, roles: ["manager", "deputy"] },
   { to: "/assistant", label: "المساعد الذكي", icon: BrainCircuit, roles: ["manager", "deputy"] },
 ] as const;
@@ -49,7 +51,7 @@ const NAV = [
 const NAV_GROUPS = [
   { title: "يومي", paths: ["/", "/tasks", "/projects", "/planner"] },
   { title: "عملي", paths: ["/reports", "/notes"] },
-  { title: "إدارة", paths: ["/employees", "/hierarchy", "/permissions", "/map", "/assistant"] },
+  { title: "إدارة", paths: ["/employees", "/hierarchy", "/permissions", "/command", "/map", "/assistant"] },
 ] as const;
 
 function NotFoundComponent() {
