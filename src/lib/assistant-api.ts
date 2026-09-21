@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { buildArtOfWarSystemPrompt } from "@/lib/art-of-war";
+import { ART_OF_WAR_CHAPTERS, buildArtOfWarSystemPrompt } from "@/lib/art-of-war";
 
 type ChatTurn = { role: "user" | "assistant" | "system"; content: string };
 type AssistantMode = "exec" | "art-of-war";
@@ -8,29 +8,23 @@ const EXEC_SYSTEM = `أنت مساعد تنفيذي عربي لنظام إدار
 أجب بالعربية الفصحى الواضحة، باختصار منظم (نقاط عند الحاجة).
 ساعد في التخطيط، الأولويات، المشاريع، والمهام. لا تختلق بيانات غير موجودة في السؤال.`;
 
-const FALLBACK_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-flash-latest",
-  "gemini-3.6-flash",
-] as const;
+/** نماذج سريعة ومستقرة على الطبقة المجانية */
+const FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"] as const;
 
-const PER_CALL_MS = 14_000;
-const MAX_ATTEMPTS = 2;
+const PER_CALL_MS = 12_000;
+const MAX_MODELS = 2;
 
 function toGeminiContents(messages: ChatTurn[]) {
   const turns = messages
     .filter((m) => m.role === "user" || m.role === "assistant")
-    .slice(-16)
+    .slice(-10)
     .map((m) => ({
       role: (m.role === "assistant" ? "model" : "user") as "user" | "model",
       parts: [{ text: m.content }],
     }));
 
-  // Gemini يشترط أن تبدأ المحادثة بدور user وليس model
   while (turns.length && turns[0].role === "model") turns.shift();
 
-  // دمج أدوار متتالية من نفس النوع
   const merged: typeof turns = [];
   for (const t of turns) {
     const last = merged[merged.length - 1];
@@ -46,15 +40,65 @@ function toGeminiContents(messages: ChatTurn[]) {
 function modelCandidates() {
   const preferred = process.env.GEMINI_MODEL?.trim();
   const list = preferred ? [preferred, ...FALLBACK_MODELS] : [...FALLBACK_MODELS];
-  return [...new Set(list)].slice(0, 4);
-}
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+  return [...new Set(list)].slice(0, MAX_MODELS);
 }
 
 function isBusyStatus(status: number) {
   return status === 503 || status === 429 || status === 502;
+}
+
+function localArtOfWarReply(question: string): string {
+  const q = question.toLowerCase();
+  const scored = ART_OF_WAR_CHAPTERS.map((c) => {
+    const hay = `${c.title} ${c.summary} ${c.maxims.join(" ")} ${c.apply.join(" ")}`.toLowerCase();
+    let score = 0;
+    for (const word of q.split(/\s+/).filter((w) => w.length > 2)) {
+      if (hay.includes(word)) score += 1;
+    }
+    if (/إمداد|امداد|تأخير|تأخر|موارد|وقت/.test(q) && /حرب|إمداد|موارد|وقت|إطالة/.test(hay)) score += 3;
+    if (/هجوم|تقدم|ضغط/.test(q) && /هجوم|استراتيج|زخم/.test(hay)) score += 2;
+    if (/دفاع|تأمين|ضعف/.test(q) && /دفاع|تشكيل|ضعف/.test(hay)) score += 2;
+    return { c, score };
+  })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((x) => x.c);
+
+  const picks = scored.length ? scored : ART_OF_WAR_CHAPTERS.slice(0, 3);
+
+  const lines = [
+    "تقييم سريع وفق فن الحرب (وضع محلي — النموذج السحابي غير متاح حالياً):",
+    "",
+    `السؤال: ${question}`,
+    "",
+    "الفصول الأنسب:",
+    ...picks.map(
+      (c) =>
+        `• الفصل ${c.chapter} — ${c.title}: ${c.maxims[0]}\n  تطبيق: ${c.apply[0]}`,
+    ),
+    "",
+    "خطة عمل مقترحة:",
+    "1) أمّن خط الإمداد/البديل قبل أي تصعيد (الفصل 2 و4).",
+    "2) قلّص النطاق واضرب في نقطة حاسمة بدل الاستنزاف الطويل (الفصل 3 و6).",
+    "3) حدّد مهلة قرار واضحة؛ الإطالة تُنهك حتى المنتصر (الفصل 2).",
+    "",
+    "أعد المحاولة لاحقاً للحصول على رد أعمق من النموذج عند توفره.",
+  ];
+  return lines.join("\n");
+}
+
+function localExecReply(question: string): string {
+  return [
+    "تعذّر الاتصال بالنموذج الآن. هذا رد تشغيلي مختصر:",
+    "",
+    `طلبك: ${question}`,
+    "",
+    "• حدّد أولوية واحدة قابلة للتنفيذ خلال 24 ساعة.",
+    "• اكتب القيد الأهم (وقت / أشخاص / معلومة).",
+    "• اختر مساراً واحداً وأجّل الباقي صراحة.",
+    "",
+    "أعد المحاولة بعد دقائق لرد أعمق من المساعد.",
+  ].join("\n");
 }
 
 async function generateOnce(key: string, model: string, system: string, messages: ChatTurn[]) {
@@ -68,7 +112,7 @@ async function generateOnce(key: string, model: string, system: string, messages
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents,
-      generationConfig: { temperature: 0.35, maxOutputTokens: 2048 },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 900 },
     }),
     signal: AbortSignal.timeout(PER_CALL_MS),
   });
@@ -77,67 +121,65 @@ async function generateOnce(key: string, model: string, system: string, messages
   return { res, errText };
 }
 
-async function callGemini(system: string, messages: ChatTurn[]) {
+async function callGemini(system: string, messages: ChatTurn[], mode: AssistantMode) {
   const key = process.env.GEMINI_API_KEY?.trim();
+  const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+
   if (!key) {
-    throw new Error(
-      "لم يُضبط مفتاح GEMINI_API_KEY المجاني. أنشئه من Google AI Studio وأضفه في Vercel ثم أعد النشر.",
-    );
+    return {
+      content:
+        mode === "art-of-war"
+          ? localArtOfWarReply(lastUser)
+          : "لم يُضبط مفتاح GEMINI_API_KEY. أضفه في Vercel ثم أعد النشر.",
+    };
   }
 
-  let lastBusy = false;
   let lastErr = "";
 
   for (const model of modelCandidates()) {
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      if (attempt > 0) await sleep(500 * attempt);
-      try {
-        const { res, errText } = await generateOnce(key, model, system, messages);
+    try {
+      const { res, errText } = await generateOnce(key, model, system, messages);
 
-        if (res.ok) {
-          const json = (await res.json()) as {
-            candidates?: { content?: { parts?: { text?: string }[] } }[];
-          };
-          const content = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
-          if (!content) throw new Error("رد فارغ من النموذج");
-          return { content };
-        }
-
-        lastErr = `${res.status} ${errText.slice(0, 160)}`;
-        if (isBusyStatus(res.status)) {
-          lastBusy = true;
-          continue;
-        }
-        if (res.status === 404) break;
-        if (res.status === 400 || res.status === 401 || res.status === 403) {
-          throw new Error(`تعذّر الرد من النموذج: ${lastErr}`);
-        }
-        break;
-      } catch (e) {
-        if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
-          lastErr = "انتهت مهلة الاتصال بالنموذج";
-          lastBusy = true;
-          continue;
-        }
-        throw e;
+      if (res.ok) {
+        const json = (await res.json()) as {
+          candidates?: { content?: { parts?: { text?: string }[] } }[];
+        };
+        const content = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
+        if (content) return { content };
+        lastErr = "رد فارغ";
+        continue;
       }
+
+      lastErr = `${res.status}`;
+      if (res.status === 404) continue;
+      if (isBusyStatus(res.status)) continue;
+      if (res.status === 400 || res.status === 401 || res.status === 403) break;
+    } catch (e) {
+      if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+        lastErr = "timeout";
+        continue;
+      }
+      lastErr = e instanceof Error ? e.message : "error";
     }
   }
 
-  if (lastBusy) {
-    throw new Error(
-      "النموذج مشغول أو بطيء الآن. انتظر قليلاً ثم أعد المحاولة.",
-    );
+  // لا نترك المستخدم معلقاً: رد محلي فوري من الكتاب
+  if (mode === "art-of-war") {
+    return { content: localArtOfWarReply(lastUser) };
   }
-  throw new Error(`تعذّر الرد من النموذج: ${lastErr || "خطأ غير معروف"}`);
+  return { content: localExecReply(lastUser || lastErr) };
 }
 
-export const askAssistant = createServerFn({ method: "POST" }).handler(
-  async (ctx: { data?: { messages?: ChatTurn[]; mode?: AssistantMode } }) => {
-    const messages = ctx.data?.messages;
-    if (!messages?.length) throw new Error("الرسالة فارغة");
-    const mode = ctx.data?.mode ?? "exec";
+export const askAssistant = createServerFn({ method: "POST" })
+  .validator((data: { messages: ChatTurn[]; mode?: AssistantMode }) => {
+    if (!data?.messages?.length) throw new Error("الرسالة فارغة");
+    return {
+      messages: data.messages,
+      mode: data.mode ?? ("exec" as AssistantMode),
+    };
+  })
+  .handler(async ({ data }) => {
+    const mode = data.mode;
     const system = mode === "art-of-war" ? buildArtOfWarSystemPrompt() : EXEC_SYSTEM;
-    return callGemini(system, messages);
-  },
-);
+    return callGemini(system, data.messages, mode);
+  });

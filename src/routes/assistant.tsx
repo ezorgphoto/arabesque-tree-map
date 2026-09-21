@@ -151,7 +151,10 @@ function AssistantPage() {
       const res = await Promise.race([
         askAssistant({ data: { messages: history } }),
         new Promise<never>((_, reject) =>
-          window.setTimeout(() => reject(new Error("انتهت المهلة — أعد المحاولة بعد لحظات")), 38_000),
+          window.setTimeout(
+            () => reject(new Error("الخادم لم يرد في الوقت المحدد — أعد المحاولة بعد لحظات")),
+            55_000,
+          ),
         ),
       ]);
       setMessages((m) => [

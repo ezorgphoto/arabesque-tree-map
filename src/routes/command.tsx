@@ -223,7 +223,10 @@ function CommandRoomPage() {
       const res = await Promise.race([
         askAssistant({ data: { messages: history, mode: "art-of-war" } }),
         new Promise<never>((_, reject) =>
-          window.setTimeout(() => reject(new Error("انتهت المهلة — أعد المحاولة بعد لحظات")), 38_000),
+          window.setTimeout(
+            () => reject(new Error("الخادم لم يرد في الوقت المحدد — سيُعرض تقييم محلي عند إعادة المحاولة")),
+            55_000,
+          ),
         ),
       ]);
       setWarChat((m) => [...m, { id: uid(), role: "assistant", content: res.content }]);
