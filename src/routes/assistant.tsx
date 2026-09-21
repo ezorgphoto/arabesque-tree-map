@@ -148,13 +148,23 @@ function AssistantPage() {
         .filter((m) => m.role === "user" || m.role === "assistant")
         .slice(-16)
         .map((m) => ({ role: m.role, content: m.content }));
-      const res = await askAssistant({ data: { messages: history } });
+      const res = await Promise.race([
+        askAssistant({ data: { messages: history } }),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error("انتهت المهلة — أعد المحاولة بعد لحظات")), 38_000),
+        ),
+      ]);
       setMessages((m) => [
         ...m,
         { id: uid(), role: "assistant", content: res.content, at: Date.now() },
       ]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "تعذّر الاتصال بالمساعد");
+      const msg = e instanceof Error ? e.message : "تعذّر الاتصال بالمساعد";
+      setMessages((m) => [
+        ...m,
+        { id: uid(), role: "assistant", content: `تعذّر إكمال الرد:\n${msg}`, at: Date.now() },
+      ]);
+      toast.error(msg);
     } finally {
       setThinking(false);
       inputRef.current?.focus();

@@ -85,7 +85,7 @@ function CommandRoomPage() {
   const [pendingArrow, setPendingArrow] = useState<[number, number] | null>(null);
   const [unitDraft, setUnitDraft] = useState({
     kind: "troops" as UnitKind,
-    label: "",
+    label: "قوة",
     note: "",
     qty: 0,
   });
@@ -94,8 +94,9 @@ function CommandRoomPage() {
     note: "",
     color: ARROW_COLORS[0].key,
   });
-  const [calloutDraft, setCalloutDraft] = useState("شرح التقدم…");
+  const [calloutDraft, setCalloutDraft] = useState("ملاحظة ميدانية");
   const [mapCenter, setMapCenter] = useState<[number, number]>([33.5, 36.3]);
+  const [unitSeq, setUnitSeq] = useState(1);
   const [warChat, setWarChat] = useState<ChatMsg[]>([
     {
       id: "intro",
@@ -108,7 +109,9 @@ function CommandRoomPage() {
   const [warThinking, setWarThinking] = useState(false);
 
   useEffect(() => {
-    setState(loadCommandRoom());
+    const loaded = loadCommandRoom();
+    setState(loaded);
+    setUnitSeq(Math.max(1, (loaded.units?.length ?? 0) + 1));
     setReady(true);
   }, []);
 
@@ -117,7 +120,17 @@ function CommandRoomPage() {
     return () => window.clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    if (!ready) return;
+    const t = window.setTimeout(() => saveCommandRoom(state), 600);
+    return () => window.clearTimeout(t);
+  }, [state, ready]);
+
   if (!isManager) return <Navigate to="/" />;
+
+  const units = state.units ?? [];
+  const arrows = state.arrows ?? [];
+  const callouts = state.callouts ?? [];
 
   const patch = (partial: Partial<CommandRoomState>) =>
     setState((s) => ({ ...s, ...partial }));
@@ -147,27 +160,23 @@ function CommandRoomPage() {
   const onAnalystPick = (lat: number, lng: number) => {
     setMapCenter([lat, lng]);
     if (analystTool === "unit") {
-      if (!unitDraft.label.trim()) {
-        toast.error("اكتب اسم الوحدة أولاً ثم انقر على الخريطة");
-        return;
-      }
+      const label = unitDraft.label.trim() || `وحدة ${unitSeq}`;
       const unit: AnalystUnit = {
         id: uid(),
         kind: unitDraft.kind,
-        label: unitDraft.label.trim(),
+        label,
         note: unitDraft.note.trim(),
         qty: Number(unitDraft.qty) || 0,
         lat,
         lng,
       };
-      patch({ units: [...state.units, unit] });
-      toast.success("وُضعت الوحدة على الخريطة");
+      patch({ units: [...units, unit] });
+      setUnitSeq((n) => n + 1);
       return;
     }
     if (analystTool === "arrow") {
       if (!pendingArrow) {
         setPendingArrow([lat, lng]);
-        toast.message("نقطة البداية جاهزة — انقر نهاية السهم");
         return;
       }
       const arrow: AnalystArrow = {
@@ -180,26 +189,22 @@ function CommandRoomPage() {
         toLat: lat,
         toLng: lng,
       };
-      patch({ arrows: [...state.arrows, arrow] });
+      patch({ arrows: [...arrows, arrow] });
       setPendingArrow(null);
-      toast.success("أُضيف سهم التقدم");
       return;
     }
     if (analystTool === "callout") {
-      if (!calloutDraft.trim()) {
-        toast.error("اكتب نص الشرح أولاً");
-        return;
-      }
       const callout: AnalystCallout = {
         id: uid(),
-        text: calloutDraft.trim(),
+        text: calloutDraft.trim() || "ملاحظة ميدانية",
         lat,
         lng,
       };
-      patch({ callouts: [...state.callouts, callout] });
-      toast.success("أُضيف شرح على الخريطة");
+      patch({ callouts: [...callouts, callout] });
     }
   };
+
+  const placeAtCenter = () => onAnalystPick(mapCenter[0], mapCenter[1]);
 
   const askWar = async () => {
     const value = warInput.trim();
@@ -211,13 +216,24 @@ function CommandRoomPage() {
     setWarThinking(true);
     try {
       const history = next
+        .filter((m) => m.id !== "intro")
         .filter((m) => m.role === "user" || m.role === "assistant")
-        .slice(-14)
+        .slice(-12)
         .map((m) => ({ role: m.role, content: m.content }));
-      const res = await askAssistant({ data: { messages: history, mode: "art-of-war" } });
+      const res = await Promise.race([
+        askAssistant({ data: { messages: history, mode: "art-of-war" } }),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error("انتهت المهلة — أعد المحاولة بعد لحظات")), 38_000),
+        ),
+      ]);
       setWarChat((m) => [...m, { id: uid(), role: "assistant", content: res.content }]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "تعذّر الاتصال بمساعد فن الحرب");
+      const msg = e instanceof Error ? e.message : "تعذّر الاتصال بمساعد فن الحرب";
+      setWarChat((m) => [
+        ...m,
+        { id: uid(), role: "assistant", content: `تعذّر إكمال الرد:\n${msg}` },
+      ]);
+      toast.error(msg);
     } finally {
       setWarThinking(false);
     }
@@ -231,7 +247,7 @@ function CommandRoomPage() {
 
   const tabs: { key: Tab; label: string; icon: typeof Radio }[] = [
     { key: "brief", label: "نشرة ميدانية", icon: Radio },
-    { key: "news", label: "تغطية تحليلية", icon: Users },
+    { key: "news", label: "غرفة العمليات", icon: Users },
     { key: "topo", label: "خرائط طبوغرافية", icon: MapIcon },
     { key: "war", label: "فصول فن الحرب", icon: BookOpen },
     { key: "warAi", label: "مساعد فن الحرب", icon: Bot },
@@ -240,11 +256,22 @@ function CommandRoomPage() {
 
   const analystTicker =
     [
-      ...state.units.slice(0, 4).map((u) => `وحدة · ${u.label}${u.qty ? ` ×${u.qty}` : ""}`),
-      ...state.arrows.slice(0, 3).map((a) => `سهم · ${a.label || "تقدم"}`),
-      ...state.callouts.slice(0, 2).map((c) => `شرح · ${c.text.slice(0, 28)}`),
-    ].join(" · ") || flashTickerText(state.flashes);
+      ...units.slice(0, 4).map((u) => `وحدة · ${u.label}${u.qty ? ` ×${u.qty}` : ""}`),
+      ...arrows.slice(0, 3).map((a) => `سهم · ${a.label || "تقدم"}`),
+      ...callouts.slice(0, 2).map((c) => `شرح · ${c.text.slice(0, 28)}`),
+    ].join(" · ") || flashTickerText(state.flashes ?? []);
   const ticker = analystTicker.endsWith(" · ") ? analystTicker : `${analystTicker} · `;
+
+  const opsHint =
+    analystTool === "unit"
+      ? `انقر الخريطة لوضع: ${unitDraft.label || "وحدة"}`
+      : analystTool === "arrow"
+        ? pendingArrow
+          ? "انقر نهاية سهم الحركة"
+          : "انقر بداية سهم الحركة ثم نهايته"
+        : analystTool === "callout"
+          ? "انقر الخريطة لإضافة ملاحظة تحليلية"
+          : "حرّك الخريطة — التحرير متوقف";
 
   return (
     <div className="space-y-4">
@@ -323,75 +350,129 @@ function CommandRoomPage() {
       )}
 
       {tab === "news" && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-1 rounded-lg border bg-card p-1">
-              {(
-                [
-                  { key: "unit" as const, label: "وضع وحدة", icon: Users },
-                  { key: "arrow" as const, label: "رسم سهم", icon: ArrowUpRight },
-                  { key: "callout" as const, label: "شرح تقدّم", icon: MessageSquareText },
-                  { key: "pan" as const, label: "تحريك فقط", icon: Hand },
-                ] as const
-              ).map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => {
-                    setAnalystTool(t.key);
-                    setPendingArrow(null);
-                  }}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold ${
-                    analystTool === t.key
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  <t.icon className="size-3.5" />
-                  {t.label}
-                </button>
-              ))}
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b1220] text-[#e8eef7]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+            <div>
+              <p className="text-[10px] font-bold tracking-[0.18em] text-teal-300/90">OPS BOARD</p>
+              <h2 className="text-lg font-extrabold">غرفة العمليات الميدانية</h2>
             </div>
-            <div className="panel h-[440px] overflow-hidden p-0 md:h-[560px]">
-              <ClientOnly
-                fallback={
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    تحميل لوحة التحليل…
-                  </div>
-                }
-              >
-                <Suspense fallback={<div className="flex h-full items-center justify-center text-sm">…</div>}>
-                  <AnalystMap
-                    units={state.units}
-                    arrows={state.arrows}
-                    callouts={state.callouts}
-                    center={mapCenter}
-                    tool={analystTool}
-                    pendingArrowStart={pendingArrow}
-                    onPick={onAnalystPick}
-                    onSelectUnit={() => {}}
-                    onSelectArrow={() => {}}
-                    onSelectCallout={() => {}}
-                  />
-                </Suspense>
-              </ClientOnly>
+            <div className="flex flex-wrap gap-1.5 text-[11px]">
+              <span className="rounded bg-white/10 px-2 py-1">وحدات {units.length}</span>
+              <span className="rounded bg-white/10 px-2 py-1">أسهم {arrows.length}</span>
+              <span className="rounded bg-white/10 px-2 py-1">ملاحظات {callouts.length}</span>
             </div>
-            <p className="text-xs text-muted-foreground">
-              اختر الأداة ثم انقر على الخريطة — مثل محلل يضع الجنود والأسهم ويشرح التقدم مباشرة على الشاشة.
-            </p>
           </div>
 
-          <div className="panel space-y-4 p-4">
-            {analystTool === "unit" && (
-              <div className="space-y-3">
-                <h2 className="font-extrabold">وحدة على الخريطة</h2>
-                <div>
-                  <Label>النوع</Label>
+          <div className="grid lg:grid-cols-[1fr_300px]">
+            <div className="relative min-h-[520px] border-b border-white/10 lg:border-b-0 lg:border-l lg:border-white/10">
+              <div className="absolute inset-x-0 top-0 z-[500] flex flex-wrap items-center gap-1.5 bg-gradient-to-b from-[#0b1220] to-transparent p-3 pb-8">
+                {(
+                  [
+                    { key: "unit" as const, label: "وحدة", icon: Users },
+                    { key: "arrow" as const, label: "سهم حركة", icon: ArrowUpRight },
+                    { key: "callout" as const, label: "تحليل", icon: MessageSquareText },
+                    { key: "pan" as const, label: "تحريك", icon: Hand },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => {
+                      setAnalystTool(t.key);
+                      setPendingArrow(null);
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-bold ${
+                      analystTool === t.key
+                        ? "bg-teal-500 text-[#041016]"
+                        : "bg-black/55 text-white/85 ring-1 ring-white/15 hover:bg-black/70"
+                    }`}
+                  >
+                    <t.icon className="size-3.5" />
+                    {t.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={placeAtCenter}
+                  disabled={analystTool === "pan"}
+                  className="rounded-md bg-amber-500/90 px-3 py-2 text-xs font-bold text-[#1a1200] disabled:opacity-40"
+                >
+                  وضع في المركز
+                </button>
+              </div>
+
+              <div className="absolute inset-x-0 bottom-0 z-[500] px-3 pb-3">
+                <div className="rounded-md border border-teal-400/30 bg-[#0b1220]/92 px-3 py-2 text-xs font-semibold text-teal-100">
+                  {opsHint}
+                </div>
+              </div>
+
+              <div className="absolute inset-0">
+                <ClientOnly
+                  fallback={
+                    <div className="flex h-full items-center justify-center text-sm text-white/60">
+                      تحميل لوحة العمليات…
+                    </div>
+                  }
+                >
+                  <Suspense fallback={<div className="flex h-full items-center justify-center text-sm">…</div>}>
+                    <AnalystMap
+                      units={units}
+                      arrows={arrows}
+                      callouts={callouts}
+                      center={mapCenter}
+                      zoom={8}
+                      tool={analystTool}
+                      pendingArrowStart={pendingArrow}
+                      onPick={onAnalystPick}
+                      onSelectUnit={() => setAnalystTool("pan")}
+                      onSelectArrow={() => setAnalystTool("pan")}
+                      onSelectCallout={() => setAnalystTool("pan")}
+                    />
+                  </Suspense>
+                </ClientOnly>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-4">
+              <div>
+                <p className="mb-2 text-[11px] font-bold text-white/50">قوالب سريعة — ثم انقر الخريطة</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(
+                    [
+                      { kind: "troops" as const, label: "سرية", qty: 30 },
+                      { kind: "troops" as const, label: "فصيلة", qty: 12 },
+                      { kind: "vehicles" as const, label: "آليات", qty: 4 },
+                      { kind: "hq" as const, label: "قيادة", qty: 0 },
+                      { kind: "gear" as const, label: "عتاد", qty: 0 },
+                      { kind: "other" as const, label: "نقطة", qty: 0 },
+                    ] as const
+                  ).map((p) => (
+                    <button
+                      key={`${p.kind}-${p.label}`}
+                      type="button"
+                      onClick={() => {
+                        setAnalystTool("unit");
+                        setPendingArrow(null);
+                        setUnitDraft({ kind: p.kind, label: p.label, note: "", qty: p.qty });
+                      }}
+                      className="rounded-md border border-white/10 bg-white/5 px-2 py-2 text-xs font-bold hover:bg-white/10"
+                    >
+                      {p.label}
+                      {p.qty ? ` · ${p.qty}` : ""}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {analystTool === "unit" && (
+                <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs font-extrabold">تفاصيل الوحدة</p>
                   <Select
                     value={unitDraft.kind}
                     onValueChange={(v) => setUnitDraft((d) => ({ ...d, kind: v as UnitKind }))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="border-white/15 bg-[#0b1220] text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent dir="rtl">
@@ -402,53 +483,51 @@ function CommandRoomPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label>الاسم / التسمية</Label>
                   <Input
+                    className="border-white/15 bg-[#0b1220] text-white"
                     value={unitDraft.label}
                     onChange={(e) => setUnitDraft((d) => ({ ...d, label: e.target.value }))}
-                    placeholder="مثال: سرية أولى"
+                    placeholder="اسم الوحدة"
                   />
-                </div>
-                <div>
-                  <Label>العدد</Label>
                   <Input
+                    className="border-white/15 bg-[#0b1220] text-white"
                     type="number"
                     value={String(unitDraft.qty)}
                     onChange={(e) => setUnitDraft((d) => ({ ...d, qty: Number(e.target.value) || 0 }))}
+                    placeholder="العدد"
                   />
-                </div>
-                <div>
-                  <Label>ملاحظة</Label>
                   <Textarea
+                    className="border-white/15 bg-[#0b1220] text-white"
                     rows={2}
                     value={unitDraft.note}
                     onChange={(e) => setUnitDraft((d) => ({ ...d, note: e.target.value }))}
+                    placeholder="حالة / مهمة مختصرة"
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground">بعد تعبئة الحقول انقر موقع الوحدة على الخريطة.</p>
-              </div>
-            )}
+              )}
 
-            {analystTool === "arrow" && (
-              <div className="space-y-3">
-                <h2 className="font-extrabold">سهم تقدّم</h2>
-                <div>
-                  <Label>عنوان السهم</Label>
-                  <Input
-                    value={arrowDraft.label}
-                    onChange={(e) => setArrowDraft((d) => ({ ...d, label: e.target.value }))}
-                    placeholder="تقدم / انسحاب / دعم"
-                  />
-                </div>
-                <div>
-                  <Label>اللون</Label>
+              {analystTool === "arrow" && (
+                <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs font-extrabold">سهم الحركة</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(["تقدم", "انسحاب", "التفاف", "دعم"] as const).map((l) => (
+                      <button
+                        key={l}
+                        type="button"
+                        onClick={() => setArrowDraft((d) => ({ ...d, label: l }))}
+                        className={`rounded-md px-2 py-1.5 text-xs font-bold ${
+                          arrowDraft.label === l ? "bg-red-500 text-white" : "bg-black/40 ring-1 ring-white/10"
+                        }`}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
                   <Select
                     value={arrowDraft.color}
                     onValueChange={(v) => setArrowDraft((d) => ({ ...d, color: v }))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="border-white/15 bg-[#0b1220] text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent dir="rtl">
@@ -459,98 +538,105 @@ function CommandRoomPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label>شرح الحركة</Label>
                   <Textarea
+                    className="border-white/15 bg-[#0b1220] text-white"
                     rows={2}
                     value={arrowDraft.note}
                     onChange={(e) => setArrowDraft((d) => ({ ...d, note: e.target.value }))}
-                    placeholder="من أين وإلى أين ولماذا…"
+                    placeholder="هدف الحركة…"
+                  />
+                  {pendingArrow && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-white/20 text-white"
+                      onClick={() => setPendingArrow(null)}
+                    >
+                      إلغاء نقطة البداية
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {analystTool === "callout" && (
+                <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs font-extrabold">نص التحليل على الخريطة</p>
+                  <Textarea
+                    className="border-white/15 bg-[#0b1220] text-white"
+                    rows={3}
+                    value={calloutDraft}
+                    onChange={(e) => setCalloutDraft(e.target.value)}
+                    placeholder="شرح التقدم / الخطر / الفرصة…"
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {pendingArrow
-                    ? "انقر الآن نقطة النهاية على الخريطة."
-                    : "انقر نقطة البداية ثم نقطة النهاية."}
-                </p>
-                {pendingArrow && (
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPendingArrow(null)}>
-                    إلغاء البداية
-                  </Button>
-                )}
-              </div>
-            )}
+              )}
 
-            {analystTool === "callout" && (
-              <div className="space-y-3">
-                <h2 className="font-extrabold">شرح على الشاشة</h2>
-                <Textarea
-                  rows={4}
-                  value={calloutDraft}
-                  onChange={(e) => setCalloutDraft(e.target.value)}
-                  placeholder="مثال: الضغط يتصاعد من الجهة الشرقية…"
-                />
-                <p className="text-[11px] text-muted-foreground">انقر مكان الظهور على الخريطة.</p>
-              </div>
-            )}
-
-            {analystTool === "pan" && (
-              <p className="text-sm text-muted-foreground">حرّك الخريطة بحرية دون إضافة عناصر.</p>
-            )}
-
-            <div className="border-t pt-3">
-              <h3 className="mb-2 text-xs font-extrabold">العناصر على اللوحة</h3>
-              <ul className="max-h-52 space-y-2 overflow-y-auto text-xs">
-                {state.units.map((u) => (
-                  <li key={u.id} className="flex items-start justify-between gap-2 border-b pb-2">
-                    <span>
-                      <strong>{u.label}</strong>
-                      <span className="block text-muted-foreground">
-                        {UNIT_KIND_LABEL[u.kind]}
-                        {u.qty ? ` · ${u.qty}` : ""}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-white/50">سجل اللوحة</p>
+                  <button
+                    type="button"
+                    className="text-[11px] text-red-300 hover:underline"
+                    onClick={() => {
+                      patch({ units: [], arrows: [], callouts: [] });
+                      setPendingArrow(null);
+                    }}
+                  >
+                    مسح الكل
+                  </button>
+                </div>
+                <ul className="max-h-56 space-y-2 overflow-y-auto text-xs">
+                  {units.map((u) => (
+                    <li key={u.id} className="flex items-start justify-between gap-2 rounded border border-white/10 bg-black/30 px-2 py-1.5">
+                      <span>
+                        <strong>{u.label}</strong>
+                        <span className="block text-white/50">
+                          {UNIT_KIND_LABEL[u.kind]}
+                          {u.qty ? ` · ${u.qty}` : ""}
+                        </span>
                       </span>
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="حذف"
-                      onClick={() => patch({ units: state.units.filter((x) => x.id !== u.id) })}
-                    >
-                      <Trash2 className="size-3.5 text-destructive" />
-                    </button>
-                  </li>
-                ))}
-                {state.arrows.map((a) => (
-                  <li key={a.id} className="flex items-start justify-between gap-2 border-b pb-2">
-                    <span>
-                      <strong>→ {a.label || "سهم"}</strong>
-                      <span className="block text-muted-foreground">{a.note || "حركة"}</span>
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="حذف"
-                      onClick={() => patch({ arrows: state.arrows.filter((x) => x.id !== a.id) })}
-                    >
-                      <Trash2 className="size-3.5 text-destructive" />
-                    </button>
-                  </li>
-                ))}
-                {state.callouts.map((c) => (
-                  <li key={c.id} className="flex items-start justify-between gap-2 border-b pb-2">
-                    <span className="line-clamp-2">{c.text}</span>
-                    <button
-                      type="button"
-                      aria-label="حذف"
-                      onClick={() => patch({ callouts: state.callouts.filter((x) => x.id !== c.id) })}
-                    >
-                      <Trash2 className="size-3.5 text-destructive" />
-                    </button>
-                  </li>
-                ))}
-                {!state.units.length && !state.arrows.length && !state.callouts.length && (
-                  <p className="text-muted-foreground">لا عناصر بعد — ابدأ بوضع وحدة أو سهم.</p>
-                )}
-              </ul>
+                      <button
+                        type="button"
+                        aria-label="حذف"
+                        onClick={() => patch({ units: units.filter((x) => x.id !== u.id) })}
+                      >
+                        <Trash2 className="size-3.5 text-red-400" />
+                      </button>
+                    </li>
+                  ))}
+                  {arrows.map((a) => (
+                    <li key={a.id} className="flex items-start justify-between gap-2 rounded border border-white/10 bg-black/30 px-2 py-1.5">
+                      <span>
+                        <strong>→ {a.label || "سهم"}</strong>
+                        <span className="block text-white/50">{a.note || "حركة"}</span>
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="حذف"
+                        onClick={() => patch({ arrows: arrows.filter((x) => x.id !== a.id) })}
+                      >
+                        <Trash2 className="size-3.5 text-red-400" />
+                      </button>
+                    </li>
+                  ))}
+                  {callouts.map((c) => (
+                    <li key={c.id} className="flex items-start justify-between gap-2 rounded border border-white/10 bg-black/30 px-2 py-1.5">
+                      <span className="line-clamp-2">{c.text}</span>
+                      <button
+                        type="button"
+                        aria-label="حذف"
+                        onClick={() => patch({ callouts: callouts.filter((x) => x.id !== c.id) })}
+                      >
+                        <Trash2 className="size-3.5 text-red-400" />
+                      </button>
+                    </li>
+                  ))}
+                  {!units.length && !arrows.length && !callouts.length && (
+                    <p className="text-white/45">اختر قالباً أو أداة ثم انقر الخريطة — أو «وضع في المركز».</p>
+                  )}
+                </ul>
+              </div>
             </div>
           </div>
         </div>

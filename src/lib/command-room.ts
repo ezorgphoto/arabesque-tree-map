@@ -126,7 +126,18 @@ export function loadCommandRoom(): CommandRoomState {
       localStorage.getItem("exec_command_room_v2") ??
       localStorage.getItem("exec_command_room_v1");
     if (!raw) return emptyCommandRoom();
-    return { ...emptyCommandRoom(), ...(JSON.parse(raw) as Partial<CommandRoomState>) };
+    const parsed = JSON.parse(raw) as Partial<CommandRoomState>;
+    const base = emptyCommandRoom();
+    return {
+      ...base,
+      ...parsed,
+      marks: Array.isArray(parsed.marks) ? parsed.marks : base.marks,
+      flashes: Array.isArray(parsed.flashes) ? parsed.flashes : base.flashes,
+      units: Array.isArray(parsed.units) ? parsed.units : base.units,
+      arrows: Array.isArray(parsed.arrows) ? parsed.arrows : base.arrows,
+      callouts: Array.isArray(parsed.callouts) ? parsed.callouts : base.callouts,
+      warNotes: parsed.warNotes && typeof parsed.warNotes === "object" ? parsed.warNotes : base.warNotes,
+    };
   } catch {
     return emptyCommandRoom();
   }
