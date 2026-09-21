@@ -2,33 +2,40 @@ import { createFileRoute, ClientOnly, Navigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  ArrowUpRight,
   BookOpen,
   Bot,
   Compass,
+  Hand,
   Map as MapIcon,
+  MessageSquareText,
   Radio,
   Save,
   Send,
   Trash2,
-  Tv,
+  Users,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
 import { askAssistant } from "@/lib/assistant-api";
 import { ART_OF_WAR_CHAPTERS } from "@/lib/art-of-war";
 import {
+  ARROW_COLORS,
   ART_OF_WAR,
   emptyCommandRoom,
   flashTickerText,
   loadCommandRoom,
-  NEWS_KIND_LABEL,
   saveCommandRoom,
   uid,
+  UNIT_KIND_LABEL,
+  type AnalystArrow,
+  type AnalystCallout,
+  type AnalystUnit,
   type CommandRoomState,
-  type NewsFlash,
-  type NewsKind,
   type TopoMark,
+  type UnitKind,
 } from "@/lib/command-room";
+import type { AnalystTool } from "@/components/AnalystMap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +49,7 @@ import {
 } from "@/components/ui/select";
 
 const TopoMap = lazy(() => import("@/components/TopoMap"));
+const AnalystMap = lazy(() => import("@/components/AnalystMap"));
 
 export const Route = createFileRoute("/command")({
   component: CommandRoomPage,
@@ -73,12 +81,21 @@ function CommandRoomPage() {
   });
   const [selected, setSelected] = useState<TopoMark | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const [flashForm, setFlashForm] = useState<{
-    kind: NewsKind;
-    title: string;
-    detail: string;
-    qty: number;
-  }>({ kind: "troops", title: "", detail: "", qty: 0 });
+  const [analystTool, setAnalystTool] = useState<AnalystTool>("unit");
+  const [pendingArrow, setPendingArrow] = useState<[number, number] | null>(null);
+  const [unitDraft, setUnitDraft] = useState({
+    kind: "troops" as UnitKind,
+    label: "",
+    note: "",
+    qty: 0,
+  });
+  const [arrowDraft, setArrowDraft] = useState({
+    label: "تقدم",
+    note: "",
+    color: ARROW_COLORS[0].key,
+  });
+  const [calloutDraft, setCalloutDraft] = useState("شرح التقدم…");
+  const [mapCenter, setMapCenter] = useState<[number, number]>([33.5, 36.3]);
   const [warChat, setWarChat] = useState<ChatMsg[]>([
     {
       id: "intro",
@@ -127,22 +144,61 @@ function CommandRoomPage() {
     toast.success("أُضيفت نقطة على الخريطة الطبوغرافية");
   };
 
-  const addFlash = () => {
-    if (!flashForm.title.trim()) {
-      toast.error("أدخل عنوان التحديث");
+  const onAnalystPick = (lat: number, lng: number) => {
+    setMapCenter([lat, lng]);
+    if (analystTool === "unit") {
+      if (!unitDraft.label.trim()) {
+        toast.error("اكتب اسم الوحدة أولاً ثم انقر على الخريطة");
+        return;
+      }
+      const unit: AnalystUnit = {
+        id: uid(),
+        kind: unitDraft.kind,
+        label: unitDraft.label.trim(),
+        note: unitDraft.note.trim(),
+        qty: Number(unitDraft.qty) || 0,
+        lat,
+        lng,
+      };
+      patch({ units: [...state.units, unit] });
+      toast.success("وُضعت الوحدة على الخريطة");
       return;
     }
-    const flash: NewsFlash = {
-      id: uid(),
-      kind: flashForm.kind,
-      title: flashForm.title.trim(),
-      detail: flashForm.detail.trim(),
-      qty: Number(flashForm.qty) || 0,
-      at: Date.now(),
-    };
-    patch({ flashes: [flash, ...state.flashes].slice(0, 80) });
-    setFlashForm({ kind: flashForm.kind, title: "", detail: "", qty: 0 });
-    toast.success("نُشر التحديث على شريط الأخبار");
+    if (analystTool === "arrow") {
+      if (!pendingArrow) {
+        setPendingArrow([lat, lng]);
+        toast.message("نقطة البداية جاهزة — انقر نهاية السهم");
+        return;
+      }
+      const arrow: AnalystArrow = {
+        id: uid(),
+        label: arrowDraft.label.trim() || "تقدم",
+        note: arrowDraft.note.trim(),
+        color: arrowDraft.color,
+        fromLat: pendingArrow[0],
+        fromLng: pendingArrow[1],
+        toLat: lat,
+        toLng: lng,
+      };
+      patch({ arrows: [...state.arrows, arrow] });
+      setPendingArrow(null);
+      toast.success("أُضيف سهم التقدم");
+      return;
+    }
+    if (analystTool === "callout") {
+      if (!calloutDraft.trim()) {
+        toast.error("اكتب نص الشرح أولاً");
+        return;
+      }
+      const callout: AnalystCallout = {
+        id: uid(),
+        text: calloutDraft.trim(),
+        lat,
+        lng,
+      };
+      patch({ callouts: [...state.callouts, callout] });
+      toast.success("أُضيف شرح على الخريطة");
+    }
   };
 
   const askWar = async () => {
@@ -175,14 +231,20 @@ function CommandRoomPage() {
 
   const tabs: { key: Tab; label: string; icon: typeof Radio }[] = [
     { key: "brief", label: "نشرة ميدانية", icon: Radio },
-    { key: "news", label: "غرفة الأخبار", icon: Tv },
+    { key: "news", label: "تغطية تحليلية", icon: Users },
     { key: "topo", label: "خرائط طبوغرافية", icon: MapIcon },
     { key: "war", label: "فصول فن الحرب", icon: BookOpen },
     { key: "warAi", label: "مساعد فن الحرب", icon: Bot },
     { key: "env", label: "بيئة التخطيط", icon: Compass },
   ];
 
-  const ticker = flashTickerText(state.flashes);
+  const analystTicker =
+    [
+      ...state.units.slice(0, 4).map((u) => `وحدة · ${u.label}${u.qty ? ` ×${u.qty}` : ""}`),
+      ...state.arrows.slice(0, 3).map((a) => `سهم · ${a.label || "تقدم"}`),
+      ...state.callouts.slice(0, 2).map((c) => `شرح · ${c.text.slice(0, 28)}`),
+    ].join(" · ") || flashTickerText(state.flashes);
+  const ticker = analystTicker.endsWith(" · ") ? analystTicker : `${analystTicker} · `;
 
   return (
     <div className="space-y-4">
@@ -261,90 +323,235 @@ function CommandRoomPage() {
       )}
 
       {tab === "news" && (
-        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="panel space-y-3 p-5">
-            <h2 className="font-extrabold">إضافة تحديث (مثل قنوات الأخبار)</h2>
-            <p className="text-xs text-muted-foreground">
-              سجّل دخول جنود أو آليات أو عتاد أو تحرك — يظهر فوراً على شريط العاجل أعلاه.
-            </p>
-            <div>
-              <Label>النوع</Label>
-              <Select
-                value={flashForm.kind}
-                onValueChange={(v) => setFlashForm((f) => ({ ...f, kind: v as NewsKind }))}
+        <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-1 rounded-lg border bg-card p-1">
+              {(
+                [
+                  { key: "unit" as const, label: "وضع وحدة", icon: Users },
+                  { key: "arrow" as const, label: "رسم سهم", icon: ArrowUpRight },
+                  { key: "callout" as const, label: "شرح تقدّم", icon: MessageSquareText },
+                  { key: "pan" as const, label: "تحريك فقط", icon: Hand },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => {
+                    setAnalystTool(t.key);
+                    setPendingArrow(null);
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold ${
+                    analystTool === t.key
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <t.icon className="size-3.5" />
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="panel h-[440px] overflow-hidden p-0 md:h-[560px]">
+              <ClientOnly
+                fallback={
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    تحميل لوحة التحليل…
+                  </div>
+                }
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  {(Object.keys(NEWS_KIND_LABEL) as NewsKind[]).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {NEWS_KIND_LABEL[k]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Suspense fallback={<div className="flex h-full items-center justify-center text-sm">…</div>}>
+                  <AnalystMap
+                    units={state.units}
+                    arrows={state.arrows}
+                    callouts={state.callouts}
+                    center={mapCenter}
+                    tool={analystTool}
+                    pendingArrowStart={pendingArrow}
+                    onPick={onAnalystPick}
+                    onSelectUnit={() => {}}
+                    onSelectArrow={() => {}}
+                    onSelectCallout={() => {}}
+                  />
+                </Suspense>
+              </ClientOnly>
             </div>
-            <div>
-              <Label>العنوان العاجل</Label>
-              <Input
-                value={flashForm.title}
-                onChange={(e) => setFlashForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="مثال: وصول دفعة آليات خفيفة"
-              />
-            </div>
-            <div>
-              <Label>العدد (اختياري)</Label>
-              <Input
-                type="number"
-                value={String(flashForm.qty)}
-                onChange={(e) => setFlashForm((f) => ({ ...f, qty: Number(e.target.value) || 0 }))}
-              />
-            </div>
-            <div>
-              <Label>التفاصيل</Label>
-              <Textarea
-                rows={4}
-                value={flashForm.detail}
-                onChange={(e) => setFlashForm((f) => ({ ...f, detail: e.target.value }))}
-                placeholder="المصدر، الاتجاه، الملاحظات…"
-              />
-            </div>
-            <Button className="w-full" onClick={addFlash}>
-              بث التحديث
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              اختر الأداة ثم انقر على الخريطة — مثل محلل يضع الجنود والأسهم ويشرح التقدم مباشرة على الشاشة.
+            </p>
           </div>
-          <div className="panel space-y-3 p-5">
-            <h2 className="font-extrabold">سجل البث</h2>
-            <ul className="max-h-[28rem] space-y-3 overflow-y-auto">
-              {state.flashes.map((f) => (
-                <li key={f.id} className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] font-bold text-red-600">
-                        عاجل · {NEWS_KIND_LABEL[f.kind]}
-                        {f.qty ? ` · ${f.qty}` : ""}
-                      </p>
-                      <p className="font-extrabold">{f.title}</p>
-                      {f.detail ? <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p> : null}
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {new Date(f.at).toLocaleString("ar-SY")}
-                      </p>
-                    </div>
+
+          <div className="panel space-y-4 p-4">
+            {analystTool === "unit" && (
+              <div className="space-y-3">
+                <h2 className="font-extrabold">وحدة على الخريطة</h2>
+                <div>
+                  <Label>النوع</Label>
+                  <Select
+                    value={unitDraft.kind}
+                    onValueChange={(v) => setUnitDraft((d) => ({ ...d, kind: v as UnitKind }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl">
+                      {(Object.keys(UNIT_KIND_LABEL) as UnitKind[]).map((k) => (
+                        <SelectItem key={k} value={k}>
+                          {UNIT_KIND_LABEL[k]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>الاسم / التسمية</Label>
+                  <Input
+                    value={unitDraft.label}
+                    onChange={(e) => setUnitDraft((d) => ({ ...d, label: e.target.value }))}
+                    placeholder="مثال: سرية أولى"
+                  />
+                </div>
+                <div>
+                  <Label>العدد</Label>
+                  <Input
+                    type="number"
+                    value={String(unitDraft.qty)}
+                    onChange={(e) => setUnitDraft((d) => ({ ...d, qty: Number(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div>
+                  <Label>ملاحظة</Label>
+                  <Textarea
+                    rows={2}
+                    value={unitDraft.note}
+                    onChange={(e) => setUnitDraft((d) => ({ ...d, note: e.target.value }))}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">بعد تعبئة الحقول انقر موقع الوحدة على الخريطة.</p>
+              </div>
+            )}
+
+            {analystTool === "arrow" && (
+              <div className="space-y-3">
+                <h2 className="font-extrabold">سهم تقدّم</h2>
+                <div>
+                  <Label>عنوان السهم</Label>
+                  <Input
+                    value={arrowDraft.label}
+                    onChange={(e) => setArrowDraft((d) => ({ ...d, label: e.target.value }))}
+                    placeholder="تقدم / انسحاب / دعم"
+                  />
+                </div>
+                <div>
+                  <Label>اللون</Label>
+                  <Select
+                    value={arrowDraft.color}
+                    onValueChange={(v) => setArrowDraft((d) => ({ ...d, color: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl">
+                      {ARROW_COLORS.map((c) => (
+                        <SelectItem key={c.key} value={c.key}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>شرح الحركة</Label>
+                  <Textarea
+                    rows={2}
+                    value={arrowDraft.note}
+                    onChange={(e) => setArrowDraft((d) => ({ ...d, note: e.target.value }))}
+                    placeholder="من أين وإلى أين ولماذا…"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {pendingArrow
+                    ? "انقر الآن نقطة النهاية على الخريطة."
+                    : "انقر نقطة البداية ثم نقطة النهاية."}
+                </p>
+                {pendingArrow && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPendingArrow(null)}>
+                    إلغاء البداية
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {analystTool === "callout" && (
+              <div className="space-y-3">
+                <h2 className="font-extrabold">شرح على الشاشة</h2>
+                <Textarea
+                  rows={4}
+                  value={calloutDraft}
+                  onChange={(e) => setCalloutDraft(e.target.value)}
+                  placeholder="مثال: الضغط يتصاعد من الجهة الشرقية…"
+                />
+                <p className="text-[11px] text-muted-foreground">انقر مكان الظهور على الخريطة.</p>
+              </div>
+            )}
+
+            {analystTool === "pan" && (
+              <p className="text-sm text-muted-foreground">حرّك الخريطة بحرية دون إضافة عناصر.</p>
+            )}
+
+            <div className="border-t pt-3">
+              <h3 className="mb-2 text-xs font-extrabold">العناصر على اللوحة</h3>
+              <ul className="max-h-52 space-y-2 overflow-y-auto text-xs">
+                {state.units.map((u) => (
+                  <li key={u.id} className="flex items-start justify-between gap-2 border-b pb-2">
+                    <span>
+                      <strong>{u.label}</strong>
+                      <span className="block text-muted-foreground">
+                        {UNIT_KIND_LABEL[u.kind]}
+                        {u.qty ? ` · ${u.qty}` : ""}
+                      </span>
+                    </span>
                     <button
                       type="button"
                       aria-label="حذف"
-                      onClick={() => patch({ flashes: state.flashes.filter((x) => x.id !== f.id) })}
+                      onClick={() => patch({ units: state.units.filter((x) => x.id !== u.id) })}
                     >
-                      <Trash2 className="size-4 text-destructive" />
+                      <Trash2 className="size-3.5 text-destructive" />
                     </button>
-                  </div>
-                </li>
-              ))}
-              {!state.flashes.length && (
-                <p className="text-sm text-muted-foreground">لا تحديثات بعد. أضف أول بث من اليسار.</p>
-              )}
-            </ul>
+                  </li>
+                ))}
+                {state.arrows.map((a) => (
+                  <li key={a.id} className="flex items-start justify-between gap-2 border-b pb-2">
+                    <span>
+                      <strong>→ {a.label || "سهم"}</strong>
+                      <span className="block text-muted-foreground">{a.note || "حركة"}</span>
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="حذف"
+                      onClick={() => patch({ arrows: state.arrows.filter((x) => x.id !== a.id) })}
+                    >
+                      <Trash2 className="size-3.5 text-destructive" />
+                    </button>
+                  </li>
+                ))}
+                {state.callouts.map((c) => (
+                  <li key={c.id} className="flex items-start justify-between gap-2 border-b pb-2">
+                    <span className="line-clamp-2">{c.text}</span>
+                    <button
+                      type="button"
+                      aria-label="حذف"
+                      onClick={() => patch({ callouts: state.callouts.filter((x) => x.id !== c.id) })}
+                    >
+                      <Trash2 className="size-3.5 text-destructive" />
+                    </button>
+                  </li>
+                ))}
+                {!state.units.length && !state.arrows.length && !state.callouts.length && (
+                  <p className="text-muted-foreground">لا عناصر بعد — ابدأ بوضع وحدة أو سهم.</p>
+                )}
+              </ul>
+            </div>
           </div>
         </div>
       )}

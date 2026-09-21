@@ -23,6 +23,36 @@ export type NewsFlash = {
   at: number;
 };
 
+export type UnitKind = "troops" | "vehicles" | "gear" | "hq" | "other";
+
+export type AnalystUnit = {
+  id: string;
+  kind: UnitKind;
+  label: string;
+  note: string;
+  qty: number;
+  lat: number;
+  lng: number;
+};
+
+export type AnalystArrow = {
+  id: string;
+  label: string;
+  note: string;
+  color: string;
+  fromLat: number;
+  fromLng: number;
+  toLat: number;
+  toLng: number;
+};
+
+export type AnalystCallout = {
+  id: string;
+  text: string;
+  lat: number;
+  lng: number;
+};
+
 export type CommandRoomState = {
   headline: string;
   lead: string;
@@ -32,6 +62,9 @@ export type CommandRoomState = {
   marks: TopoMark[];
   warNotes: Record<string, string>;
   flashes: NewsFlash[];
+  units: AnalystUnit[];
+  arrows: AnalystArrow[];
+  callouts: AnalystCallout[];
   updatedAt: number;
 };
 
@@ -43,6 +76,21 @@ export const NEWS_KIND_LABEL: Record<NewsKind, string> = {
   other: "أخرى",
 };
 
+export const UNIT_KIND_LABEL: Record<UnitKind, string> = {
+  troops: "جنود / قوة",
+  vehicles: "آليات",
+  gear: "عتاد",
+  hq: "قيادة / نقطة",
+  other: "أخرى",
+};
+
+export const ARROW_COLORS = [
+  { key: "#ef4444", label: "أحمر — تقدم" },
+  { key: "#22c55e", label: "أخضر — تأمين" },
+  { key: "#3b82f6", label: "أزرق — دعم" },
+  { key: "#f59e0b", label: "برتقالي — ضغط" },
+] as const;
+
 export const ENV_PROMPTS = [
   "ما حالة الميدان اليوم؟ (هادئ / متوتر / فرصة)",
   "ما القيد الأهم هذا الأسبوع؟ (وقت، أشخاص، معلومة)",
@@ -51,7 +99,7 @@ export const ENV_PROMPTS = [
   "ما المعلومة الناقصة قبل أي خطوة كبيرة؟",
 ] as const;
 
-const KEY = "exec_command_room_v2";
+const KEY = "exec_command_room_v3";
 
 export function emptyCommandRoom(): CommandRoomState {
   return {
@@ -63,6 +111,9 @@ export function emptyCommandRoom(): CommandRoomState {
     marks: [],
     warNotes: {},
     flashes: [],
+    units: [],
+    arrows: [],
+    callouts: [],
     updatedAt: Date.now(),
   };
 }
@@ -70,7 +121,10 @@ export function emptyCommandRoom(): CommandRoomState {
 export function loadCommandRoom(): CommandRoomState {
   if (typeof window === "undefined") return emptyCommandRoom();
   try {
-    const raw = localStorage.getItem(KEY) ?? localStorage.getItem("exec_command_room_v1");
+    const raw =
+      localStorage.getItem(KEY) ??
+      localStorage.getItem("exec_command_room_v2") ??
+      localStorage.getItem("exec_command_room_v1");
     if (!raw) return emptyCommandRoom();
     return { ...emptyCommandRoom(), ...(JSON.parse(raw) as Partial<CommandRoomState>) };
   } catch {
