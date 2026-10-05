@@ -7,6 +7,7 @@ import { api, currency, STATUSES, type Employee } from "@/lib/api";
 import { ROLE_LABEL, useAuth } from "@/lib/auth";
 import { listReports, formatDate } from "@/lib/reports-hub";
 import { DEPARTMENT_LABELS } from "@/lib/report-templates";
+import { getMbti, isMbtiCode, MBTI_TYPES, mbtiLabel } from "@/lib/mbti";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -179,6 +180,7 @@ function EmployeesPage() {
           {rows.map((e) => {
             const unit = e.org_unit || e.department;
             const role = e.app_role && e.app_role in ROLE_LABEL ? ROLE_LABEL[e.app_role] : null;
+            const mbti = getMbti(e.personality_type);
             return (
               <li key={e.id} className="flex w-full items-center gap-3 px-4 py-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-extrabold text-primary">
@@ -189,10 +191,16 @@ function EmployeesPage() {
                   <p className="truncate text-sm text-muted-foreground">
                     {e.job_title || "بدون مسمى"}
                     {unit && unit !== "عام" ? ` · ${unit}` : ""}
+                    {mbti ? ` · ${mbti.code}` : ""}
                   </p>
                 </div>
+                {mbti ? (
+                  <Badge variant="outline" className="hidden shrink-0 font-mono text-[10px] sm:inline-flex">
+                    {mbti.code}
+                  </Badge>
+                ) : null}
                 {role ? (
-                  <span className="hidden shrink-0 text-xs font-semibold text-muted-foreground sm:block">
+                  <span className="hidden shrink-0 text-xs font-semibold text-muted-foreground md:block">
                     {role}
                   </span>
                 ) : null}
@@ -371,16 +379,96 @@ function EmployeesPage() {
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
         <DialogContent dir="rtl" className="max-h-[85vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>الملف الشخصي والتقييم — {profile.full_name}</DialogTitle>
+            <DialogTitle>المتابعة والتقييم — {profile.full_name}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4">
-            <div>
-              <Label>نمط الشخصية</Label>
-              <Input
-                value={profile.personality_type ?? ""}
-                onChange={(e) => setProfileField("personality_type", e.target.value)}
-                placeholder="مثال: منظّم تحليلي، قيادي، تعاوني..."
-              />
+            <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
+              <div>
+                <Label>نمط الشخصية (MBTI)</Label>
+                <Select
+                  value={isMbtiCode(profile.personality_type) ? profile.personality_type : "__none__"}
+                  onValueChange={(v) =>
+                    setProfileField("personality_type", v === "__none__" ? "" : v)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر أحد الأنماط الـ16..." />
+                  </SelectTrigger>
+                  <SelectContent dir="rtl" className="max-h-72">
+                    <SelectItem value="__none__">غير محدد</SelectItem>
+                    {MBTI_TYPES.map((t) => (
+                      <SelectItem key={t.code} value={t.code}>
+                        {mbtiLabel(t.code)} · {t.groupLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {profile.personality_type && !isMbtiCode(profile.personality_type) ? (
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    كان محفوظاً نصاً حراً: «{profile.personality_type}» — اختر نمط MBTI لاستبداله.
+                  </p>
+                ) : null}
+              </div>
+
+              {(() => {
+                const mbti = getMbti(profile.personality_type);
+                if (!mbti) {
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      اختر نمطاً لعرض تحليل المتابعة والتقييم الخاص به (16 شخصية MBTI).
+                    </p>
+                  );
+                }
+                return (
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <p className="text-[11px] font-bold text-primary">
+                        {mbti.code} — {mbti.nameAr}
+                        <span className="ms-2 font-normal text-muted-foreground">({mbti.groupLabel})</span>
+                      </p>
+                      <p className="mt-1 text-muted-foreground">{mbti.summary}</p>
+                      <p className="mt-1 text-xs">
+                        <span className="font-semibold">أسلوب العمل: </span>
+                        {mbti.workStyle}
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg border bg-background p-3">
+                        <p className="mb-1 text-[11px] font-extrabold text-emerald-700">نقاط القوة النمطية</p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          {mbti.strengths.map((s) => (
+                            <li key={s}>• {s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="rounded-lg border bg-background p-3">
+                        <p className="mb-1 text-[11px] font-extrabold text-amber-700">تنبّه أثناء المتابعة</p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          {mbti.watchFor.map((s) => (
+                            <li key={s}>• {s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="rounded-lg border bg-background p-3">
+                        <p className="mb-1 text-[11px] font-extrabold">كيف تتابعه؟</p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          {mbti.followUp.map((s) => (
+                            <li key={s}>• {s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="rounded-lg border bg-background p-3">
+                        <p className="mb-1 text-[11px] font-extrabold">على ماذا تقيّمه؟</p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          {mbti.evaluateBy.map((s) => (
+                            <li key={s}>• {s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
