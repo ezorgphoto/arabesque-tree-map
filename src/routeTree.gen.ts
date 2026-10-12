@@ -18,6 +18,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as NotesRouteImport } from './routes/notes'
 import { Route as EvaluationsRouteImport } from './routes/evaluations'
+import { Route as ExecutiveRouteImport } from './routes/executive'
 import { Route as PermissionsRouteImport } from './routes/permissions'
 import { Route as PlannerRouteImport } from './routes/planner'
 import { Route as ProjectsRouteImport } from './routes/projects'
@@ -87,6 +88,11 @@ const EvaluationsRoute = EvaluationsRouteImport.update({
   path: '/evaluations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExecutiveRoute = ExecutiveRouteImport.update({
+  id: '/executive',
+  path: '/executive',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlannerRoute = PlannerRouteImport.update({
   id: '/planner',
   path: '/planner',
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/evaluations': typeof EvaluationsRoute
+  '/executive': typeof ExecutiveRoute
   '/planner': typeof PlannerRoute
   '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/evaluations': typeof EvaluationsRoute
+  '/executive': typeof ExecutiveRoute
   '/planner': typeof PlannerRoute
   '/tasks': typeof TasksRoute
   '/reports/new': typeof ReportsNewRoute
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
   '/evaluations': typeof EvaluationsRoute
+  '/executive': typeof ExecutiveRoute
   '/planner': typeof PlannerRoute
   '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/notes'
     | '/evaluations'
+    | '/executive'
     | '/planner'
     | '/reports'
     | '/tasks'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/notes'
     | '/evaluations'
+    | '/executive'
     | '/planner'
     | '/tasks'
     | '/reports/new'
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/notes'
     | '/evaluations'
+    | '/executive'
     | '/planner'
     | '/reports'
     | '/tasks'
@@ -242,6 +254,7 @@ export interface RootRouteChildren {
   MapRoute: typeof MapRoute
   NotesRoute: typeof NotesRoute
   EvaluationsRoute: typeof EvaluationsRoute
+  ExecutiveRoute: typeof ExecutiveRoute
   PlannerRoute: typeof PlannerRoute
   ReportsRoute: typeof ReportsRouteWithChildren
   TasksRoute: typeof TasksRoute
@@ -333,6 +346,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EvaluationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/executive': {
+      id: '/executive'
+      path: '/executive'
+      fullPath: '/executive'
+      preLoaderRoute: typeof ExecutiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/planner': {
       id: '/planner'
       path: '/planner'
@@ -397,6 +417,7 @@ const rootRouteChildren: RootRouteChildren = {
   MapRoute: MapRoute,
   NotesRoute: NotesRoute,
   EvaluationsRoute: EvaluationsRoute,
+  ExecutiveRoute: ExecutiveRoute,
   PlannerRoute: PlannerRoute,
   ReportsRoute: ReportsRouteWithChildren,
   TasksRoute: TasksRoute,

@@ -26,6 +26,7 @@ import {
   Shield,
   ClipboardCheck,
   Radio,
+  Crown,
 } from "lucide-react";
 
 import appCss from "../styles.css?url";
@@ -43,6 +44,7 @@ const NAV = [
   { to: "/notes", label: "الملاحظات", icon: NotebookPen, roles: ["manager", "deputy", "supervisor"] },
   { to: "/employees", label: "الزملاء", icon: Users, roles: ["manager", "deputy"] },
   { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network, roles: ["manager", "deputy"] },
+  { to: "/executive", label: "القيادة التنفيذية", icon: Crown, roles: ["manager", "deputy"] },
   { to: "/permissions", label: "الصلاحيات", icon: Shield, roles: ["manager"] },
   { to: "/command", label: "غرفة التخطيط", icon: Radio, roles: ["manager"] },
   { to: "/map", label: "خريطة الفروع", icon: MapPin, roles: ["manager", "deputy"] },
@@ -52,7 +54,10 @@ const NAV = [
 const NAV_GROUPS = [
   { title: "يومي", paths: ["/", "/tasks", "/planner"] },
   { title: "عملي", paths: ["/evaluations", "/reports", "/notes"] },
-  { title: "إدارة", paths: ["/employees", "/hierarchy", "/permissions", "/command", "/map", "/assistant"] },
+  {
+    title: "إدارة",
+    paths: ["/executive", "/employees", "/hierarchy", "/permissions", "/command", "/map", "/assistant"],
+  },
 ] as const;
 
 function NotFoundComponent() {
