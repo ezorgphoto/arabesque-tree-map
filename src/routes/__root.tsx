@@ -9,7 +9,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
@@ -35,6 +35,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { NotificationBell } from "@/components/NotificationBell";
 import { AuthProvider, ROLE_LABEL, useAuth } from "@/lib/auth";
+import { AuthSessionSkeleton } from "@/components/auth/AuthSessionSkeleton";
 
 const NAV = [
   { to: "/", label: "لوحة القيادة", icon: LayoutDashboard, roles: ["manager", "deputy", "supervisor"] },
@@ -178,10 +179,21 @@ function RootShell({ children }: { children: ReactNode }) {
 function AuthQuerySync() {
   const { profile, session, loading } = useAuth();
   const qc = useQueryClient();
+  const synced = useRef(false);
   useEffect(() => {
-    if (!loading && session && profile?.id) {
-      void qc.invalidateQueries();
+    // Invalidate once per session+profile pair to avoid refetch flicker loops
+    if (!loading && session && profile?.id && !synced.current) {
+      synced.current = true;
+      void qc.invalidateQueries({
+        predicate: (q) => {
+          const key = String(q.queryKey[0] ?? "");
+          return ["employees", "tasks", "projects", "reports", "evaluations", "notes", "branches"].includes(
+            key,
+          );
+        },
+      });
     }
+    if (!session) synced.current = false;
   }, [loading, session, profile?.id, qc]);
   return null;
 }
@@ -322,11 +334,7 @@ function AuthGate() {
 
   // انتظر اكتمال الجلسة+الملف قبل عرض الصفحات حتى لا تظهر قوائم فارغة للمشرف
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        جارٍ التحقق من الجلسة…
-      </div>
-    );
+    return <AuthSessionSkeleton />;
   }
   if (!session && !isLogin) return <Navigate to="/login" />;
   if (session && isLogin) return <Navigate to="/" />;

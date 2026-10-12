@@ -1,8 +1,11 @@
-/**
- * Barrel for executive dashboard modules.
- */
-export { ExecutiveDashboard } from "./ExecutiveDashboard";
-export { PendingQueue } from "./PendingQueue";
-export { ExecutiveFeed } from "./ExecutiveFeed";
-export { QuickActionBar } from "./QuickActionBar";
-export { ExecShell, ConnectionBadge, MetricCard, ExecSkeleton } from "./ExecShell";
+/** Compatibility shim — prefer `@/features/executive` */
+export {
+  ExecutiveDashboard,
+  PendingQueue,
+  ExecutiveFeed,
+  QuickActionBar,
+  ExecShell,
+  ConnectionBadge,
+  MetricCard,
+  ExecSkeleton,
+} from "@/features/executive";

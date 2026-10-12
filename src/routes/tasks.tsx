@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, CalendarDays, Lightbulb, Plus, Trash2, User } from "lucide-react";
-import { api, PRIORITIES, TASK_COLUMNS, type Task } from "@/lib/api";
+import { api, PRIORITIES, type Task } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { buildTaskSuggestions } from "@/lib/task-suggestions";
 import { detectWorkloadOverlaps } from "@/lib/task-overlap";
+import { KANBAN_PRIORITIES, priorityBadgeClass, TASK_BOARD_COLUMNS } from "@/features/tasks/constants";
+import { sanitizePlainText, validateTaskPayload } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,12 +48,6 @@ const empty: Partial<Task> = {
   priority: "medium",
   assignee: "",
   due_date: null,
-};
-
-const priorityStyle: Record<string, string> = {
-  high: "bg-destructive/10 text-destructive",
-  medium: "bg-warning/15 text-accent-foreground",
-  low: "bg-primary/10 text-primary",
 };
 
 type ScopeFilter = "mine" | "dept" | "all";
@@ -142,6 +138,10 @@ function TasksPage() {
     mutationFn: async (payload: Partial<Task>) => {
       const { id, created_at, ...rest } = payload;
       if (!rest.due_date) rest.due_date = null;
+      if (rest.title) rest.title = sanitizePlainText(rest.title, 200);
+      if (rest.description) rest.description = sanitizePlainText(rest.description, 5000);
+      const check = validateTaskPayload(rest);
+      if (!check.ok) throw new Error(check.error);
       return id ? api.tasks.update(id, rest) : api.tasks.create(rest);
     },
     onSuccess: () => {
@@ -304,7 +304,7 @@ function TasksPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {TASK_COLUMNS.map((col) => {
+        {TASK_BOARD_COLUMNS.map((col) => {
           const items = all.filter((t) => t.status === col.key);
           return (
             <section
@@ -364,8 +364,8 @@ function TasksPage() {
                       <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{t.description}</p>
                     )}
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                      <span className={`rounded-md px-2 py-0.5 font-semibold ${priorityStyle[t.priority] ?? ""}`}>
-                        {PRIORITIES[t.priority] ?? t.priority}
+                      <span className={`rounded-md px-2 py-0.5 font-semibold ${priorityBadgeClass(t.priority)}`}>
+                        {PRIORITIES[t.priority] ?? KANBAN_PRIORITIES[t.priority as keyof typeof KANBAN_PRIORITIES] ?? t.priority}
                       </span>
                       {t.assignee && (
                         <span className="flex items-center gap-1 text-muted-foreground">
@@ -430,7 +430,7 @@ function TasksPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent dir="rtl">
-                    {TASK_COLUMNS.map((c) => (
+                    {TASK_BOARD_COLUMNS.map((c) => (
                       <SelectItem key={c.key} value={c.key}>
                         {c.label}
                       </SelectItem>

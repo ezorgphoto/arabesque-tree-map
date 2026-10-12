@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 
-import { ExecutiveDashboard } from "@/components/executive/ExecutiveDashboard";
+import { ExecutiveDashboard } from "@/features/executive";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/executive")({

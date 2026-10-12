@@ -297,14 +297,12 @@ export const REPORT_TYPES: Record<string, string> = {
 export const currency = (value: number) =>
   new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 0 }).format(value || 0);
 
-export const TASK_COLUMNS = [
-  { key: "todo", label: "قيد الانتظار" },
-  { key: "in_progress", label: "قيد التنفيذ" },
-  { key: "review", label: "قيد المراجعة" },
-  { key: "done", label: "مكتملة" },
-] as const;
+/** @deprecated Prefer TASK_BOARD_COLUMNS from `@/features/tasks/constants` */
+export { TASK_BOARD_COLUMNS as TASK_COLUMNS } from "@/features/tasks/constants";
 
+/** Unified priorities (urgent used by executive workflow; kanban uses low/medium/high) */
 export const PRIORITIES: Record<string, string> = {
+  urgent: "عاجلة",
   high: "عالية",
   medium: "متوسطة",
   low: "منخفضة",
