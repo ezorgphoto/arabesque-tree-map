@@ -1,13 +1,22 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { api, currency, STATUSES, type Employee } from "@/lib/api";
+import { ClipboardList, Pencil, Plus, Search, Trash2, UsersRound } from "lucide-react";
+import { api, STATUSES, type Employee } from "@/lib/api";
 import { ROLE_LABEL, useAuth } from "@/lib/auth";
 import { listReports, formatDate } from "@/lib/reports-hub";
 import { DEPARTMENT_LABELS } from "@/lib/report-templates";
 import { getMbti, isMbtiCode, MBTI_TYPES, mbtiLabel } from "@/lib/mbti";
+import {
+  DEFAULT_TAG_LABELS,
+  joinTagList,
+  LEVEL_DEFINITIONS,
+  LEVELS,
+  parseTagList,
+  type LevelValue,
+} from "@/lib/profile-tags";
+import { TagMultiSelect } from "@/components/TagMultiSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 export const Route = createFileRoute("/employees")({
   component: EmployeesPage,
@@ -53,10 +63,7 @@ const empty: Partial<Employee> = {
   app_role: "member",
 };
 
-// مستويات التقييم (فكري / شرعي / تدريبي)
-const LEVELS = ["مبتدئ", "متوسط", "متقدم", "متميز"] as const;
-
-// الحقول التي يحفظها ملف الموظف (تتطلب ترحيل employees_profile_fields)
+// الحقول التي يحفظها ملف الموظف
 const PROFILE_FIELDS: (keyof Employee)[] = [
   "personality_type",
   "strengths",
@@ -65,6 +72,11 @@ const PROFILE_FIELDS: (keyof Employee)[] = [
   "intellectual_level",
   "religious_level",
   "training_level",
+  "studies",
+  "is_employed",
+  "work_title",
+  "sharia_program",
+  "level_notes",
 ];
 
 function EmployeesPage() {
@@ -79,7 +91,19 @@ function EmployeesPage() {
   const employees = useQuery({ queryKey: ["employees"], queryFn: api.employees.list });
   const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches.list });
   const reports = useQuery({ queryKey: ["reports"], queryFn: listReports });
+  const tagOptions = useQuery({ queryKey: ["profile-tags"], queryFn: api.profileTags.list });
   const relatedReports = (reports.data ?? []).filter((r) => r.employee_id === profile.id);
+
+  const tagsByCategory = useMemo(() => {
+    const rows = tagOptions.data ?? [];
+    const fromDb = (cat: "strength" | "problem" | "note") =>
+      rows.filter((t) => t.category === cat).map((t) => t.label);
+    return {
+      strength: fromDb("strength").length ? fromDb("strength") : DEFAULT_TAG_LABELS.strength,
+      problem: fromDb("problem").length ? fromDb("problem") : DEFAULT_TAG_LABELS.problem,
+      note: fromDb("note").length ? fromDb("note") : DEFAULT_TAG_LABELS.note,
+    };
+  }, [tagOptions.data]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["employees"] });
 
@@ -111,7 +135,11 @@ function EmployeesPage() {
       if (!id) throw new Error("معرّف الموظف مفقود");
       const patch: Partial<Employee> = {};
       for (const key of PROFILE_FIELDS) {
-        patch[key] = (payload[key] ?? "") as never;
+        if (key === "is_employed") {
+          patch.is_employed = Boolean(payload.is_employed);
+        } else {
+          patch[key] = (payload[key] ?? "") as never;
+        }
       }
       return api.employees.update(id, patch);
     },
@@ -123,13 +151,35 @@ function EmployeesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const addTagOption = useMutation({
+    mutationFn: async (input: { category: "strength" | "problem" | "note"; label: string }) => {
+      try {
+        return await api.profileTags.create(input);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        if (/duplicate|unique/i.test(msg)) return null;
+        if (/relation|does not exist|schema cache/i.test(msg)) return null;
+        throw e;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["profile-tags"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const openProfile = (e: Employee) => {
     setProfile(e);
     setProfileOpen(true);
   };
 
-  const setProfileField = (key: keyof Employee, value: string) =>
+  const setProfileField = (key: keyof Employee, value: string | boolean) =>
     setProfile((p) => ({ ...p, [key]: value }));
+
+  const levelHint = (value?: string) => {
+    if (value && value in LEVEL_DEFINITIONS) {
+      return LEVEL_DEFINITIONS[value as LevelValue];
+    }
+    return "اختر مستوى لعرض تعريفه.";
+  };
 
   const rows = (employees.data ?? []).filter((e) =>
     [e.full_name, e.job_title, e.department, e.email, e.org_unit].join(" ").includes(term.trim()),
@@ -146,16 +196,25 @@ function EmployeesPage() {
               : "الأعضاء العاملون معك في القسم. لا يمكنك الاطلاع على مهام أو ملفات الآخرين الخاصة."}
           </p>
         </div>
-        {isLeadership && (
-          <Button
-            onClick={() => {
-              setForm(empty);
-              setOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> إضافة موظف
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {isLeadership && (
+            <Button asChild variant="outline">
+              <Link to="/recruitment">
+                <UsersRound className="size-4" /> تقرير الاستقطاب
+              </Link>
+            </Button>
+          )}
+          {isLeadership && (
+            <Button
+              onClick={() => {
+                setForm(empty);
+                setOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> إضافة موظف
+            </Button>
+          )}
+        </div>
       </header>
 
       {employees.error ? (
@@ -470,86 +529,110 @@ function EmployeesPage() {
                 );
               })()}
             </div>
+            <div className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <p className="text-xs font-extrabold">البيانات الدراسية والعملية والشرعية</p>
+              </div>
+              <div className="sm:col-span-2">
+                <Label>ماذا يدرس؟</Label>
+                <Input
+                  value={profile.studies ?? ""}
+                  onChange={(e) => setProfileField("studies", e.target.value)}
+                  placeholder="التخصص / المرحلة الدراسية…"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-2 sm:col-span-2">
+                <div>
+                  <p className="text-sm font-bold">يعمل حالياً؟</p>
+                  <p className="text-[11px] text-muted-foreground">إن كان نعم، أدخل مسمى العمل.</p>
+                </div>
+                <Switch
+                  checked={Boolean(profile.is_employed)}
+                  onCheckedChange={(v) => setProfileField("is_employed", v)}
+                />
+              </div>
+              {profile.is_employed ? (
+                <div className="sm:col-span-2">
+                  <Label>مسمى / مكان العمل</Label>
+                  <Input
+                    value={profile.work_title ?? ""}
+                    onChange={(e) => setProfileField("work_title", e.target.value)}
+                    placeholder="مثال: موظف في شركة…"
+                  />
+                </div>
+              ) : null}
+              <div className="sm:col-span-2">
+                <Label>البرنامج الشرعي الذي يمضي به</Label>
+                <Input
+                  value={profile.sharia_program ?? ""}
+                  onChange={(e) => setProfileField("sharia_program", e.target.value)}
+                  placeholder="اسم الكتاب / الدورة / المسار…"
+                />
+              </div>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <Label>المستوى الفكري</Label>
-                <Select
-                  value={profile.intellectual_level ?? ""}
-                  onValueChange={(v) => setProfileField("intellectual_level", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر..." />
-                  </SelectTrigger>
-                  <SelectContent dir="rtl">
-                    {LEVELS.map((l) => (
-                      <SelectItem key={l} value={l}>
-                        {l}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>المستوى الشرعي</Label>
-                <Select
-                  value={profile.religious_level ?? ""}
-                  onValueChange={(v) => setProfileField("religious_level", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر..." />
-                  </SelectTrigger>
-                  <SelectContent dir="rtl">
-                    {LEVELS.map((l) => (
-                      <SelectItem key={l} value={l}>
-                        {l}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>المستوى التدريبي</Label>
-                <Select
-                  value={profile.training_level ?? ""}
-                  onValueChange={(v) => setProfileField("training_level", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر..." />
-                  </SelectTrigger>
-                  <SelectContent dir="rtl">
-                    {LEVELS.map((l) => (
-                      <SelectItem key={l} value={l}>
-                        {l}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {(
+                [
+                  ["intellectual_level", "المستوى الفكري"],
+                  ["religious_level", "المستوى الشرعي"],
+                  ["training_level", "المستوى التدريبي"],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key}>
+                  <Label>{label}</Label>
+                  <Select
+                    value={profile[key] || undefined}
+                    onValueChange={(v) => setProfileField(key, v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر..." />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl">
+                      {LEVELS.map((l) => (
+                        <SelectItem key={l} value={l}>
+                          {l}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                    {levelHint(profile[key])}
+                  </p>
+                </div>
+              ))}
             </div>
             <div>
-              <Label>نقاط القوة</Label>
+              <Label>مبرّر تحديث المستويات</Label>
               <Textarea
-                value={profile.strengths ?? ""}
-                onChange={(e) => setProfileField("strengths", e.target.value)}
-                placeholder="أبرز مهارات وقدرات الموظف..."
+                value={profile.level_notes ?? ""}
+                onChange={(e) => setProfileField("level_notes", e.target.value)}
+                placeholder="لماذا هذا المستوى الآن؟ (ملاحظات موجزة عند التغيير)"
+                rows={2}
               />
             </div>
-            <div>
-              <Label>المشاكل والتحديات</Label>
-              <Textarea
-                value={profile.problems ?? ""}
-                onChange={(e) => setProfileField("problems", e.target.value)}
-                placeholder="التحديات أو الملاحظات التي تحتاج متابعة..."
-              />
-            </div>
-            <div>
-              <Label>ملاحظات عامة</Label>
-              <Textarea
-                value={profile.profile_notes ?? ""}
-                onChange={(e) => setProfileField("profile_notes", e.target.value)}
-                placeholder="ملاحظات إضافية حول الموظف..."
-              />
-            </div>
+
+            <TagMultiSelect
+              category="strength"
+              options={tagsByCategory.strength}
+              selected={parseTagList(profile.strengths)}
+              onChange={(next) => setProfileField("strengths", joinTagList(next))}
+              onAddOption={(label) => addTagOption.mutateAsync({ category: "strength", label })}
+            />
+            <TagMultiSelect
+              category="problem"
+              options={tagsByCategory.problem}
+              selected={parseTagList(profile.problems)}
+              onChange={(next) => setProfileField("problems", joinTagList(next))}
+              onAddOption={(label) => addTagOption.mutateAsync({ category: "problem", label })}
+            />
+            <TagMultiSelect
+              category="note"
+              options={tagsByCategory.note}
+              selected={parseTagList(profile.profile_notes)}
+              onChange={(next) => setProfileField("profile_notes", joinTagList(next))}
+              onAddOption={(label) => addTagOption.mutateAsync({ category: "note", label })}
+            />
             <div className="border-t pt-3">
               <Label>تقارير الأقسام المرتبطة ({relatedReports.length})</Label>
               <div className="mt-2 max-h-44 space-y-2 overflow-y-auto rounded-lg bg-muted/40 p-2">

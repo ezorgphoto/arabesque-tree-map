@@ -33,9 +33,22 @@ export type Employee = {
   intellectual_level?: string;
   religious_level?: string;
   training_level?: string;
+  /** ترحيل employees-profile-enrichment */
+  studies?: string;
+  is_employed?: boolean;
+  work_title?: string;
+  sharia_program?: string;
+  level_notes?: string;
   user_id?: string | null;
   app_role?: "manager" | "deputy" | "supervisor" | "member";
   org_unit?: string;
+};
+
+export type ProfileTagOptionRow = {
+  id: string;
+  category: "strength" | "problem" | "note";
+  label: string;
+  created_at?: string;
 };
 
 export type Task = {
@@ -141,6 +154,30 @@ export const api = {
       unwrap(await supabase.from("employees").update(row as never).eq("id", id).select().single()),
     remove: async (id: string) => {
       const { error } = await supabase.from("employees").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+  },
+  profileTags: {
+    list: async () => {
+      await withSession();
+      const res = await supabase.from("profile_tag_options").select("*").order("label");
+      if (res.error) {
+        // الجدول غير مُرحَّل بعد — الواجهة تستخدم الافتراضات المحلية
+        if (/relation|does not exist|schema cache/i.test(res.error.message)) return [];
+        throw new Error(res.error.message);
+      }
+      return (res.data ?? []) as ProfileTagOptionRow[];
+    },
+    create: async (row: { category: ProfileTagOptionRow["category"]; label: string }) =>
+      unwrap(
+        await supabase
+          .from("profile_tag_options")
+          .insert(row as never)
+          .select()
+          .single(),
+      ),
+    remove: async (id: string) => {
+      const { error } = await supabase.from("profile_tag_options").delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
   },

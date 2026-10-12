@@ -27,6 +27,7 @@ import {
   ClipboardCheck,
   Radio,
   Crown,
+  UserRoundSearch,
 } from "lucide-react";
 
 import appCss from "../styles.css?url";
@@ -43,6 +44,7 @@ const NAV = [
   { to: "/reports", label: "مركز التقارير", icon: FileBarChart2, roles: ["manager", "deputy", "supervisor"] },
   { to: "/notes", label: "الملاحظات", icon: NotebookPen, roles: ["manager", "deputy", "supervisor"] },
   { to: "/employees", label: "الزملاء", icon: Users, roles: ["manager", "deputy"] },
+  { to: "/recruitment", label: "الاستقطاب", icon: UserRoundSearch, roles: ["manager", "deputy"] },
   { to: "/hierarchy", label: "الهيكل التنظيمي", icon: Network, roles: ["manager", "deputy"] },
   { to: "/executive", label: "القيادة التنفيذية", icon: Crown, roles: ["manager", "deputy"] },
   { to: "/permissions", label: "الصلاحيات", icon: Shield, roles: ["manager"] },
@@ -56,7 +58,16 @@ const NAV_GROUPS = [
   { title: "عملي", paths: ["/evaluations", "/reports", "/notes"] },
   {
     title: "إدارة",
-    paths: ["/executive", "/employees", "/hierarchy", "/permissions", "/command", "/map", "/assistant"],
+    paths: [
+      "/executive",
+      "/employees",
+      "/recruitment",
+      "/hierarchy",
+      "/permissions",
+      "/command",
+      "/map",
+      "/assistant",
+    ],
   },
 ] as const;
 
