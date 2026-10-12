@@ -17,6 +17,7 @@ import { Route as HierarchyRouteImport } from './routes/hierarchy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as NotesRouteImport } from './routes/notes'
+import { Route as EvaluationsRouteImport } from './routes/evaluations'
 import { Route as PermissionsRouteImport } from './routes/permissions'
 import { Route as PlannerRouteImport } from './routes/planner'
 import { Route as ProjectsRouteImport } from './routes/projects'
@@ -81,6 +82,11 @@ const NotesRoute = NotesRouteImport.update({
   path: '/notes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EvaluationsRoute = EvaluationsRouteImport.update({
+  id: '/evaluations',
+  path: '/evaluations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlannerRoute = PlannerRouteImport.update({
   id: '/planner',
   path: '/planner',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/projects/$id': typeof ProjectsIdRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
+  '/evaluations': typeof EvaluationsRoute
   '/planner': typeof PlannerRoute
   '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/projects/$id': typeof ProjectsIdRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
+  '/evaluations': typeof EvaluationsRoute
   '/planner': typeof PlannerRoute
   '/tasks': typeof TasksRoute
   '/reports/new': typeof ReportsNewRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/projects/$id': typeof ProjectsIdRoute
   '/map': typeof MapRoute
   '/notes': typeof NotesRoute
+  '/evaluations': typeof EvaluationsRoute
   '/planner': typeof PlannerRoute
   '/reports': typeof ReportsRouteWithChildren
   '/tasks': typeof TasksRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/projects/$id'
     | '/map'
     | '/notes'
+    | '/evaluations'
     | '/planner'
     | '/reports'
     | '/tasks'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/projects/$id'
     | '/map'
     | '/notes'
+    | '/evaluations'
     | '/planner'
     | '/tasks'
     | '/reports/new'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/projects/$id'
     | '/map'
     | '/notes'
+    | '/evaluations'
     | '/planner'
     | '/reports'
     | '/tasks'
@@ -229,6 +241,7 @@ export interface RootRouteChildren {
   ProjectsIdRoute: typeof ProjectsIdRoute
   MapRoute: typeof MapRoute
   NotesRoute: typeof NotesRoute
+  EvaluationsRoute: typeof EvaluationsRoute
   PlannerRoute: typeof PlannerRoute
   ReportsRoute: typeof ReportsRouteWithChildren
   TasksRoute: typeof TasksRoute
@@ -313,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NotesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/evaluations': {
+      id: '/evaluations'
+      path: '/evaluations'
+      fullPath: '/evaluations'
+      preLoaderRoute: typeof EvaluationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/planner': {
       id: '/planner'
       path: '/planner'
@@ -376,6 +396,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsIdRoute: ProjectsIdRoute,
   MapRoute: MapRoute,
   NotesRoute: NotesRoute,
+  EvaluationsRoute: EvaluationsRoute,
   PlannerRoute: PlannerRoute,
   ReportsRoute: ReportsRouteWithChildren,
   TasksRoute: TasksRoute,

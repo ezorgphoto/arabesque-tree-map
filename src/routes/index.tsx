@@ -120,7 +120,7 @@ function MemberHome({ isSupervisor }: { isSupervisor: boolean }) {
       <div className="panel p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-extrabold">عمل الفريق</h2>
-          <Link to="/projects" className="text-xs font-semibold text-primary">
+          <Link to="/planner" className="text-xs font-semibold text-primary">
             عرض الكل
           </Link>
         </div>
@@ -275,7 +275,7 @@ function Dashboard() {
       <div className="panel p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-bold">عمل الفريق</h2>
-          <Link to="/projects" className="text-xs font-semibold text-primary">
+          <Link to="/planner" className="text-xs font-semibold text-primary">
             إدارة المشاريع
           </Link>
         </div>

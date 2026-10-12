@@ -128,12 +128,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const timer = window.setTimeout(() => {
         if (mounted) setLoading(false);
-      }, 2500);
+      }, 4000);
       try {
         const { data } = await supabase.auth.getSession();
         if (!mounted) return;
         keepSession(data.session);
-        setLoading(false);
         if (data.session?.user) {
           const next = await loadProfile(data.session.user);
           if (!mounted) return;
@@ -163,14 +162,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (!next) return;
       keepSession(next);
-      setLoading(false);
       if (event === "SIGNED_IN" && next.user) {
+        setLoading(true);
         void loadProfile(next.user).then((row) => {
           if (!mounted) return;
           setProfile(row);
           writeCachedProfile(row);
+          setLoading(false);
         });
+        return;
       }
+      setLoading(false);
     });
 
     return () => {

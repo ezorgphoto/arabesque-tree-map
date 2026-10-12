@@ -10,6 +10,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Network,
@@ -23,7 +24,7 @@ import {
   NotebookPen,
   LogOut,
   Shield,
-  FolderKanban,
+  ClipboardCheck,
   Radio,
 } from "lucide-react";
 
@@ -36,8 +37,8 @@ import { AuthProvider, ROLE_LABEL, useAuth } from "@/lib/auth";
 const NAV = [
   { to: "/", label: "لوحة القيادة", icon: LayoutDashboard, roles: ["manager", "deputy", "supervisor"] },
   { to: "/tasks", label: "مهامي", icon: KanbanSquare, roles: ["manager", "deputy", "supervisor"] },
-  { to: "/projects", label: "عمل الفريق", icon: FolderKanban, roles: ["manager", "deputy", "supervisor"] },
   { to: "/planner", label: "المخطط المشترك", icon: CalendarRange, roles: ["manager", "deputy", "supervisor"] },
+  { to: "/evaluations", label: "التقييمات", icon: ClipboardCheck, roles: ["manager", "deputy", "supervisor"] },
   { to: "/reports", label: "مركز التقارير", icon: FileBarChart2, roles: ["manager", "deputy", "supervisor"] },
   { to: "/notes", label: "الملاحظات", icon: NotebookPen, roles: ["manager", "deputy", "supervisor"] },
   { to: "/employees", label: "الزملاء", icon: Users, roles: ["manager", "deputy"] },
@@ -49,8 +50,8 @@ const NAV = [
 ] as const;
 
 const NAV_GROUPS = [
-  { title: "يومي", paths: ["/", "/tasks", "/projects", "/planner"] },
-  { title: "عملي", paths: ["/reports", "/notes"] },
+  { title: "يومي", paths: ["/", "/tasks", "/planner"] },
+  { title: "عملي", paths: ["/evaluations", "/reports", "/notes"] },
   { title: "إدارة", paths: ["/employees", "/hierarchy", "/permissions", "/command", "/map", "/assistant"] },
 ] as const;
 
@@ -158,12 +159,24 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function AuthQuerySync() {
+  const { profile, session, loading } = useAuth();
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!loading && session && profile?.id) {
+      void qc.invalidateQueries();
+    }
+  }, [loading, session, profile?.id, qc]);
+  return null;
+}
+
 function Shell() {
   const { profile, role, signOut } = useAuth();
   const items = NAV.filter((item) => role && item.roles.includes(role));
 
   return (
     <div className="flex h-svh overflow-hidden bg-background">
+      <AuthQuerySync />
       <aside className="hidden h-full w-[15.25rem] shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex items-center gap-3 px-4 py-5">
           <div className="flex size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
@@ -291,7 +304,8 @@ function AuthGate() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isLogin = pathname === "/login";
 
-  if (loading && !profile) {
+  // انتظر اكتمال الجلسة+الملف قبل عرض الصفحات حتى لا تظهر قوائم فارغة للمشرف
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         جارٍ التحقق من الجلسة…

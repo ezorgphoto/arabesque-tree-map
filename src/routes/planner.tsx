@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, FolderKanban, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,25 +30,38 @@ import {
   scheduleApi,
   type ScheduleBlock,
 } from "@/lib/extras";
+import { api, PROJECT_STATUSES, type Project } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/planner")({
   component: PlannerPage,
   head: () => ({
     meta: [
-      { title: "المخطط الزمني | نظام الإدارة التنفيذية" },
+      { title: "المخطط المشترك | نظام الإدارة التنفيذية" },
       {
         name: "description",
-        content: "مخطط زمني بعروض أسبوعية وشهرية وسنوية لإدارة المواعيد والمهام.",
+        content: "مواعيد مشتركة وعمل الفريق في مكان واحد.",
       },
-      { property: "og:title", content: "المخطط الزمني | نظام الإدارة التنفيذية" },
+      { property: "og:title", content: "المخطط المشترك | نظام الإدارة التنفيذية" },
       {
         property: "og:description",
-        content: "مخطط زمني بعروض أسبوعية وشهرية وسنوية لإدارة المواعيد والمهام.",
+        content: "مواعيد مشتركة وعمل الفريق في مكان واحد.",
       },
     ],
   }),
 });
+
+const emptyProject: Partial<Project> = {
+  title: "",
+  description: "",
+  status: "planned",
+  org_unit: "",
+  parent_id: null,
+  predecessor_id: null,
+  manager_id: null,
+  start_date: null,
+  end_date: null,
+};
 
 type PlannerView = "week" | "month" | "year";
 
@@ -97,15 +110,58 @@ function monthMatrix(year: number, month: number): (Date | null)[] {
 }
 
 function PlannerPage() {
-  const { isLeadership } = useAuth();
+  const { profile, isLeadership, isSupervisor, canManageTasks } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<ScheduleBlock>>(emptyBlock(0, 8));
   const [view, setView] = useState<PlannerView>("week");
   const [cursor, setCursor] = useState<Date>(() => new Date());
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [projectForm, setProjectForm] = useState<Partial<Project>>(emptyProject);
 
-  const blocks = useQuery({ queryKey: ["weekly_schedule"], queryFn: scheduleApi.list });
+  const blocks = useQuery({
+    queryKey: ["weekly_schedule"],
+    queryFn: scheduleApi.list,
+    enabled: !!profile,
+  });
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: api.projects.list,
+    enabled: !!profile,
+  });
+  const people = useQuery({
+    queryKey: ["employees"],
+    queryFn: api.employees.list,
+    enabled: !!profile && (isLeadership || isSupervisor),
+  });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["weekly_schedule"] });
+  const roots = useMemo(() => (projects.data ?? []).filter((p) => !p.parent_id), [projects.data]);
+  const canDeleteProject = (p: Project) =>
+    isLeadership || p.created_by === profile?.id || p.manager_id === profile?.id;
+
+  const saveProject = useMutation({
+    mutationFn: (row: Partial<Project>) =>
+      api.projects.create({
+        ...row,
+        created_by: profile?.id,
+        org_unit: row.org_unit || profile?.org_unit || profile?.department || "",
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["projects"] });
+      setProjectOpen(false);
+      toast.success("أُضيف المشروع إلى عمل الفريق");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeProject = useMutation({
+    mutationFn: api.projects.remove,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("حُذف المشروع");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const save = useMutation({
     mutationFn: async (payload: Partial<ScheduleBlock>) => {
@@ -133,7 +189,7 @@ function PlannerPage() {
   const all = blocks.data ?? [];
 
   const openSlot = (day: number, hour: number) => {
-    if (!isLeadership) return;
+    if (!canManageTasks) return;
     setForm(emptyBlock(day, hour));
     setOpen(true);
   };
@@ -168,9 +224,9 @@ function PlannerPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-extrabold">المخطط الزمني</h1>
+          <h1 className="text-3xl font-extrabold">المخطط المشترك</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            نظّم مواعيدك ومهامك المتكررة، واعرضها أسبوعياً أو شهرياً أو سنوياً حسب اختيارك.
+            مواعيد البرنامج المشتركة وعمل الفريق — يمكن للمشرف إضافة مواعيد ومشاريع.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -190,7 +246,7 @@ function PlannerPage() {
               </button>
             ))}
           </div>
-          {isLeadership && (
+          {canManageTasks && (
             <Button onClick={() => openSlot(0, 9)}>
               <Plus className="size-4" /> موعد جديد
             </Button>
@@ -274,7 +330,7 @@ function PlannerPage() {
                 <article key={b.id} className="rounded-xl border bg-background p-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-semibold leading-snug">{b.title}</p>
-                    {isLeadership && (
+                    {canManageTasks && (
                     <button
                       type="button"
                       onClick={() => {
@@ -326,6 +382,72 @@ function PlannerPage() {
           }}
         />
       )}
+
+      <section className="panel space-y-4 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-extrabold">
+              <FolderKanban className="size-5 text-primary" /> عمل الفريق
+            </h2>
+            <p className="text-xs text-muted-foreground">مشاريع مشتركة — إضافة وحذف من هنا مباشرة.</p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              setProjectForm({
+                ...emptyProject,
+                org_unit: profile?.org_unit || profile?.department || "",
+                manager_id: profile?.id ?? null,
+              });
+              setProjectOpen(true);
+            }}
+          >
+            <Plus className="size-4" /> مشروع جديد
+          </Button>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {roots.map((p) => (
+            <div key={p.id} className="rounded-xl border bg-background p-4">
+              <div className="flex items-start justify-between gap-2">
+                <Link
+                  to="/projects/$id"
+                  params={{ id: p.id }}
+                  className="min-w-0 flex-1 font-extrabold hover:text-primary"
+                >
+                  {p.title}
+                </Link>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    {PROJECT_STATUSES[p.status] ?? p.status}
+                  </span>
+                  {canDeleteProject(p) && (
+                    <button
+                      type="button"
+                      aria-label="حذف المشروع"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (confirm(`حذف المشروع «${p.title}»؟`)) removeProject.mutate(p.id);
+                      }}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                {p.description || "بدون وصف"}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {p.org_unit || "عام"}
+                {p.start_date || p.end_date ? ` · ${p.start_date || "؟"} → ${p.end_date || "؟"}` : ""}
+              </p>
+            </div>
+          ))}
+          {!roots.length && (
+            <p className="text-sm text-muted-foreground">لا مشاريع بعد — أضف أول مشروع للفريق.</p>
+          )}
+        </div>
+      </section>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent dir="rtl">
@@ -416,6 +538,91 @@ function PlannerPage() {
               }}
             >
               حفظ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={projectOpen} onOpenChange={setProjectOpen}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>مشروع جديد لعمل الفريق</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div>
+              <Label>العنوان</Label>
+              <Input
+                value={projectForm.title ?? ""}
+                onChange={(e) => setProjectForm({ ...projectForm, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>الوصف</Label>
+              <Textarea
+                value={projectForm.description ?? ""}
+                onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>القسم</Label>
+              <Input
+                value={projectForm.org_unit ?? ""}
+                onChange={(e) => setProjectForm({ ...projectForm, org_unit: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>البداية</Label>
+                <Input
+                  type="date"
+                  value={projectForm.start_date ?? ""}
+                  onChange={(e) =>
+                    setProjectForm({ ...projectForm, start_date: e.target.value || null })
+                  }
+                />
+              </div>
+              <div>
+                <Label>النهاية</Label>
+                <Input
+                  type="date"
+                  value={projectForm.end_date ?? ""}
+                  onChange={(e) =>
+                    setProjectForm({ ...projectForm, end_date: e.target.value || null })
+                  }
+                />
+              </div>
+            </div>
+            <div>
+              <Label>يسنده إلى</Label>
+              <Select
+                value={projectForm.manager_id ?? "none"}
+                onValueChange={(v) =>
+                  setProjectForm({ ...projectForm, manager_id: v === "none" ? null : v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر شخصاً" />
+                </SelectTrigger>
+                <SelectContent dir="rtl">
+                  <SelectItem value="none">بدون إسناد بعد</SelectItem>
+                  {(people.data ?? []).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProjectOpen(false)}>
+              إلغاء
+            </Button>
+            <Button
+              disabled={!projectForm.title?.trim() || saveProject.isPending}
+              onClick={() => saveProject.mutate(projectForm)}
+            >
+              إنشاء
             </Button>
           </DialogFooter>
         </DialogContent>
