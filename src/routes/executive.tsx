@@ -19,5 +19,5 @@ export const Route = createFileRoute("/executive")({
 function ExecutivePage() {
   const { isLeadership } = useAuth();
   if (!isLeadership) return <Navigate to="/" />;
-  return <ExecutiveDashboard live={false} />;
+  return <ExecutiveDashboard live />;
 }

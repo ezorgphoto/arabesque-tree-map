@@ -33,27 +33,59 @@ function removeById<T extends { id: string }>(list: T[], id: string): T[] {
  */
 export function useExecutiveRealtime(options: Options = {}) {
   const { enabled = true, initialTasks = [], initialDecisions = [] } = options;
-  const [tasks, setTasks] = useState<ExecutiveTask[]>(() => initialTasks);
-  const [decisions, setDecisions] = useState<ExecutiveDecision[]>(() => initialDecisions);
+  const [tasks, setTasks] = useState<ExecutiveTask[]>(() => (enabled ? [] : initialTasks));
+  const [decisions, setDecisions] = useState<ExecutiveDecision[]>(() =>
+    enabled ? [] : initialDecisions,
+  );
   const [status, setStatus] = useState<RealtimeConnectionStatus>(
     enabled ? "connecting" : "disconnected",
   );
+  const [loading, setLoading] = useState(enabled);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const rollbackRef = useRef<Map<string, ExecutiveTask>>(new Map());
 
   useEffect(() => {
-    if (!enabled) {
-      setStatus("disconnected");
-      return;
-    }
+    if (enabled) return;
+    setTasks(initialTasks);
+    setDecisions(initialDecisions);
+    setStatus("disconnected");
+    setLoading(false);
+  }, [enabled, initialTasks, initialDecisions]);
+
+  useEffect(() => {
+    if (!enabled) return;
 
     let cancelled = false;
 
     const boot = async () => {
       setStatus("connecting");
-      const { data } = await supabase.auth.getSession();
-      rememberAccessToken(data.session?.access_token ?? null);
+      setLoading(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      rememberAccessToken(sessionData.session?.access_token ?? null);
       if (cancelled) return;
+
+      const [tasksRes, decisionsRes] = await Promise.all([
+        supabase
+          .from("executive_tasks")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("executive_decisions")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
+
+      if (!cancelled) {
+        if (!tasksRes.error && tasksRes.data) {
+          setTasks(tasksRes.data as ExecutiveTask[]);
+        }
+        if (!decisionsRes.error && decisionsRes.data) {
+          setDecisions(decisionsRes.data as ExecutiveDecision[]);
+        }
+        setLoading(false);
+      }
 
       const channel = supabase
         .channel("executive-workspace")
@@ -156,6 +188,7 @@ export function useExecutiveRealtime(options: Options = {}) {
     setTasks,
     setDecisions,
     status,
+    loading,
     approveTask,
     rejectTask,
     setTaskStatusOptimistic,

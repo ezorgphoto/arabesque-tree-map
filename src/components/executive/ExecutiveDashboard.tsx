@@ -18,6 +18,8 @@ import {
 import { QuickActionBar } from "@/components/executive/QuickActionBar";
 import { PendingQueue } from "@/components/executive/PendingQueue";
 import { ExecutiveFeed } from "@/components/executive/ExecutiveFeed";
+import { useAuth } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,9 +53,17 @@ function meetingCountdown(iso: string) {
   return `${h} س ${m} د`;
 }
 
+function upsertLocal<T extends { id: string }>(list: T[], row: T): T[] {
+  const i = list.findIndex((x) => x.id === row.id);
+  if (i === -1) return [row, ...list];
+  const next = list.slice();
+  next[i] = { ...next[i], ...row };
+  return next;
+}
+
 export function ExecutiveDashboard({ live = false }: Props) {
-  const [ready] = useState(true);
-  const { tasks, decisions, setTasks, setDecisions, status, approveTask, rejectTask } =
+  const { user } = useAuth();
+  const { tasks, decisions, setTasks, setDecisions, status, loading, approveTask, rejectTask } =
     useExecutiveRealtime({
       enabled: live,
       initialTasks: MOCK_EXEC_TASKS,
@@ -62,6 +72,7 @@ export function ExecutiveDashboard({ live = false }: Props) {
 
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [delegateOpen, setDelegateOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [decisionForm, setDecisionForm] = useState({
     title: "",
     content: "",
@@ -120,7 +131,7 @@ export function ExecutiveDashboard({ live = false }: Props) {
     }
   };
 
-  if (!ready) {
+  if (live && loading) {
     return (
       <ExecShell>
         <ExecSkeleton />
@@ -174,10 +185,9 @@ export function ExecutiveDashboard({ live = false }: Props) {
         <ExecutiveFeed items={MOCK_FEED} />
       </div>
 
-      {!live && (
-        <p className="text-[11px] text-white/40">
-          وضع المعاينة ببيانات وهمية. بعد تشغيل SQL وRealtime اضبط{" "}
-          <code className="text-amber-200/80">live</code> على true.
+      {live && !tasks.length && (
+        <p className="text-[11px] text-white/45">
+          لا مهام بعد — استخدم «فوّض مهمة سريعة» أو «أصدر قراراً» للبدء.
         </p>
       )}
 
@@ -232,21 +242,48 @@ export function ExecutiveDashboard({ live = false }: Props) {
             </Button>
             <Button
               className="bg-amber-500 text-[#1a1200] hover:bg-amber-400"
-              disabled={!decisionForm.title.trim()}
+              disabled={!decisionForm.title.trim() || saving}
               onClick={() => {
-                const row: ExecutiveDecision = {
-                  id: crypto.randomUUID(),
-                  title: decisionForm.title.trim(),
-                  content: decisionForm.content.trim(),
-                  confidentiality_level: decisionForm.confidentiality_level,
-                  status: "draft",
-                  created_by: "u-exec",
-                  created_at: new Date().toISOString(),
-                };
-                setDecisions((d) => [row, ...d]);
-                setDecisionOpen(false);
-                setDecisionForm({ title: "", content: "", confidentiality_level: "internal" });
-                toast.success("أُضيفت مسودة القرار (معاينة محلية)");
+                void (async () => {
+                  setSaving(true);
+                  try {
+                    if (live) {
+                      if (!user?.id) throw new Error("يجب تسجيل الدخول");
+                      const { data, error } = await supabase
+                        .from("executive_decisions")
+                        .insert({
+                          title: decisionForm.title.trim(),
+                          content: decisionForm.content.trim(),
+                          confidentiality_level: decisionForm.confidentiality_level,
+                          status: "draft",
+                          created_by: user.id,
+                        } as never)
+                        .select("*")
+                        .single();
+                      if (error) throw error;
+                      if (data) setDecisions((d) => upsertLocal(d, data as ExecutiveDecision));
+                      toast.success("أُضيفت مسودة القرار");
+                    } else {
+                      const row: ExecutiveDecision = {
+                        id: crypto.randomUUID(),
+                        title: decisionForm.title.trim(),
+                        content: decisionForm.content.trim(),
+                        confidentiality_level: decisionForm.confidentiality_level,
+                        status: "draft",
+                        created_by: "u-exec",
+                        created_at: new Date().toISOString(),
+                      };
+                      setDecisions((d) => [row, ...d]);
+                      toast.success("أُضيفت مسودة القرار (معاينة محلية)");
+                    }
+                    setDecisionOpen(false);
+                    setDecisionForm({ title: "", content: "", confidentiality_level: "internal" });
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "فشل حفظ القرار");
+                  } finally {
+                    setSaving(false);
+                  }
+                })();
               }}
             >
               حفظ المسودة
@@ -311,26 +348,63 @@ export function ExecutiveDashboard({ live = false }: Props) {
             </Button>
             <Button
               className="bg-sky-500 text-[#041018] hover:bg-sky-400"
-              disabled={!delegateForm.title.trim()}
+              disabled={!delegateForm.title.trim() || saving}
               onClick={() => {
-                const row: ExecutiveTask = {
-                  id: crypto.randomUUID(),
-                  title: delegateForm.title.trim(),
-                  description: delegateForm.description.trim(),
-                  status: "pending",
-                  priority: delegateForm.priority,
-                  created_by: "u-exec",
-                  assigned_to: null,
-                  delegated_by: "u-exec",
-                  due_date: new Date(Date.now() + 3 * 86400000).toISOString(),
-                  reject_reason: "",
-                  created_at: new Date().toISOString(),
-                  assignee_name: delegateForm.assignee_name || "غير مسند",
-                };
-                setTasks((t) => [row, ...t]);
-                setDelegateOpen(false);
-                setDelegateForm({ title: "", description: "", assignee_name: "", priority: "high" });
-                toast.success("فُوّضت المهمة (معاينة محلية)");
+                void (async () => {
+                  setSaving(true);
+                  try {
+                    if (live) {
+                      if (!user?.id) throw new Error("يجب تسجيل الدخول");
+                      const { data, error } = await supabase
+                        .from("executive_tasks")
+                        .insert({
+                          title: delegateForm.title.trim(),
+                          description: delegateForm.description.trim(),
+                          status: "pending",
+                          priority: delegateForm.priority,
+                          created_by: user.id,
+                          delegated_by: user.id,
+                          assigned_to: null,
+                          due_date: new Date(Date.now() + 3 * 86400000).toISOString(),
+                        } as never)
+                        .select("*")
+                        .single();
+                      if (error) throw error;
+                      if (data) {
+                        setTasks((t) =>
+                          upsertLocal(t, {
+                            ...(data as ExecutiveTask),
+                            assignee_name: delegateForm.assignee_name || "غير مسند",
+                          }),
+                        );
+                      }
+                      toast.success("فُوّضت المهمة");
+                    } else {
+                      const row: ExecutiveTask = {
+                        id: crypto.randomUUID(),
+                        title: delegateForm.title.trim(),
+                        description: delegateForm.description.trim(),
+                        status: "pending",
+                        priority: delegateForm.priority,
+                        created_by: "u-exec",
+                        assigned_to: null,
+                        delegated_by: "u-exec",
+                        due_date: new Date(Date.now() + 3 * 86400000).toISOString(),
+                        reject_reason: "",
+                        created_at: new Date().toISOString(),
+                        assignee_name: delegateForm.assignee_name || "غير مسند",
+                      };
+                      setTasks((t) => [row, ...t]);
+                      toast.success("فُوّضت المهمة (معاينة محلية)");
+                    }
+                    setDelegateOpen(false);
+                    setDelegateForm({ title: "", description: "", assignee_name: "", priority: "high" });
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "فشل التفويض");
+                  } finally {
+                    setSaving(false);
+                  }
+                })();
               }}
             >
               تفويض
